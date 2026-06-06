@@ -1,0 +1,87 @@
+#!/bin/bash
+set -e
+
+PROFILE="$1"
+
+case "$PROFILE" in
+  gaming)
+    CONFIG="/etc/protonvpn-profiles/gaming.conf"
+    ;;
+  p2p)
+    CONFIG="/etc/protonvpn-profiles/p2p.conf"
+    ;;
+  maxsec)
+    CONFIG="/etc/protonvpn-profiles/maxsec.conf"
+    ;;
+  streaming)
+    CONFIG="/etc/protonvpn-profiles/streaming.conf"
+    ;;
+  status)
+    echo "WireGuard status:"
+    wg || true
+    echo
+    echo "IPv4:"
+    curl -4 --max-time 5 -s https://api.ipify.org || curl -4 --max-time 5 -s https://ifconfig.me/ip || true
+    echo
+    if systemctl is-active --quiet proton-port.service; then
+      echo "Proton port forwarding: active"
+      echo -n "TCP port: "
+      cat /run/proton-forwarded-tcp-port 2>/dev/null || echo "not assigned yet"
+      echo -n "UDP port: "
+      cat /run/proton-forwarded-udp-port 2>/dev/null || echo "not assigned yet"
+    else
+      echo "Proton port forwarding: inactive"
+    fi
+    exit 0
+    ;;
+  off)
+    systemctl stop proton-port.service 2>/dev/null || true
+    systemctl stop wg-quick@wg0 2>/dev/null || true
+    rm -f /run/proton-forwarded-tcp-port /run/proton-forwarded-udp-port /run/proton-forwarded-updated
+    echo "off" > /run/vpn-profile-current
+    echo "VPN stopped."
+    exit 0
+    ;;
+  *)
+    echo "Use: sudo vpn-profile gaming|p2p|maxsec|streaming|status|off"
+    exit 1
+    ;;
+esac
+
+if [ ! -f "$CONFIG" ]; then
+  echo "Missing config: $CONFIG"
+  exit 1
+fi
+
+systemctl stop proton-port.service 2>/dev/null || true
+systemctl stop wg-quick@wg0 2>/dev/null || true
+
+rm -f /run/proton-forwarded-tcp-port /run/proton-forwarded-udp-port /run/proton-forwarded-updated
+
+cp "$CONFIG" /etc/wireguard/wg0.conf
+chmod 600 /etc/wireguard/wg0.conf
+
+systemctl start wg-quick@wg0
+
+# Required because your home LAN 10.0.0.0/8 overlaps Proton's 10.2.0.1 NAT-PMP gateway
+ip route replace 10.2.0.1 dev wg0 2>/dev/null || true
+
+echo "$PROFILE" > /run/vpn-profile-current
+
+if [ "$PROFILE" = "p2p" ]; then
+  systemctl start proton-port.service
+fi
+
+echo "Active profile: $PROFILE"
+echo "IPv4:"
+curl -4 --max-time 5 -s https://api.ipify.org || curl -4 --max-time 5 -s https://ifconfig.me/ip || true
+echo
+
+if [ "$PROFILE" = "p2p" ]; then
+  echo "Waiting for Proton forwarded port..."
+  sleep 8
+  echo -n "TCP port: "
+  cat /run/proton-forwarded-tcp-port 2>/dev/null || echo "not assigned yet"
+  echo -n "UDP port: "
+  cat /run/proton-forwarded-udp-port 2>/dev/null || echo "not assigned yet"
+fi

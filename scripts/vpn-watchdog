@@ -1,0 +1,57 @@
+#!/bin/bash
+
+SETTINGS="/etc/protonvpn-profiles/dashboard-settings.json"
+DEFAULT="/etc/protonvpn-profiles/default-profile"
+
+read_json_value() {
+  python3 - "$1" "$2" <<'PY'
+import json, sys
+path, key = sys.argv[1], sys.argv[2]
+try:
+    print(json.load(open(path)).get(key, ""))
+except Exception:
+    print("")
+PY
+}
+
+active="$(cat /run/vpn-profile-current 2>/dev/null || cat "$DEFAULT" 2>/dev/null || echo gaming)"
+fallback="$(read_json_value "$SETTINGS" fallback_profile)"
+[ -z "$fallback" ] && fallback="gaming"
+
+if [ "$active" = "off" ]; then
+  exit 0
+fi
+
+if ! ip link show wg0 >/dev/null 2>&1; then
+  /usr/local/sbin/vpn-profile "$active"
+  exit 0
+fi
+
+latest="$(wg show wg0 latest-handshakes 2>/dev/null | awk '{print $2}' | head -n1)"
+now="$(date +%s)"
+
+if [ -z "$latest" ] || [ "$latest" = "0" ]; then
+  age=9999
+else
+  age=$((now-latest))
+fi
+
+if [ "$age" -gt 180 ]; then
+  logger "ProtonPi watchdog: stale VPN handshake age=${age}s, restarting $active"
+  /usr/local/sbin/vpn-profile "$active"
+  sleep 25
+
+  latest2="$(wg show wg0 latest-handshakes 2>/dev/null | awk '{print $2}' | head -n1)"
+  now2="$(date +%s)"
+
+  if [ -z "$latest2" ] || [ "$latest2" = "0" ]; then
+    age2=9999
+  else
+    age2=$((now2-latest2))
+  fi
+
+  if [ "$age2" -gt 180 ] && [ "$fallback" != "off" ] && [ "$fallback" != "$active" ]; then
+    logger "ProtonPi watchdog: fallback to $fallback"
+    /usr/local/sbin/vpn-profile "$fallback"
+  fi
+fi

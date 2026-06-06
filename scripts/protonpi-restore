@@ -1,0 +1,45 @@
+#!/bin/bash
+set -e
+
+BACKUP="$1"
+
+if [ -z "$BACKUP" ]; then
+  echo "Usage: sudo protonpi-restore /path/to/protonpi-backup.tar.gz"
+  exit 1
+fi
+
+case "$BACKUP" in
+  /var/lib/protonpi-dashboard/backups/*.tar.gz)
+    ;;
+  *)
+    echo "Refusing to restore from outside /var/lib/protonpi-dashboard/backups"
+    exit 1
+    ;;
+esac
+
+if [ ! -f "$BACKUP" ]; then
+  echo "Backup file not found: $BACKUP"
+  exit 1
+fi
+
+cp /opt/vpn-dashboard/app.py "/opt/vpn-dashboard/app.py.before-restore.$(date +%F-%H%M%S)" 2>/dev/null || true
+
+tar -xzf "$BACKUP" -C /
+
+chmod 700 /etc/protonvpn-profiles 2>/dev/null || true
+find /etc/protonvpn-profiles -maxdepth 1 -type f -name "*.conf" -exec chmod 600 {} \; 2>/dev/null || true
+find /etc/protonvpn-profiles -maxdepth 1 -type f -name "*.conf" -exec chown root:root {} \; 2>/dev/null || true
+
+chmod 600 /etc/protonvpn-profiles/dashboard-auth.json 2>/dev/null || true
+chmod 600 /etc/protonvpn-profiles/dashboard-settings.json 2>/dev/null || true
+chmod 600 /etc/protonvpn-profiles/client-names.json 2>/dev/null || true
+chmod 600 /etc/protonvpn-profiles/client-policies.json 2>/dev/null || true
+chmod 600 /etc/protonvpn-profiles/default-profile 2>/dev/null || true
+chmod 600 /etc/protonpi-dashboard/certs/protonpi.key 2>/dev/null || true
+
+systemctl daemon-reload
+systemctl restart vpn-dashboard-https.service 2>/dev/null || true
+systemctl restart vpn-dashboard-redirect.service 2>/dev/null || true
+systemctl restart vpn-watchdog.timer 2>/dev/null || true
+
+echo "Restored: $BACKUP"

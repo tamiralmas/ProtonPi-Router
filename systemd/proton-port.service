@@ -1,0 +1,13 @@
+[Unit]
+Description=Proton VPN NAT-PMP Port Forwarding
+After=wg-quick@wg0.service
+Requires=wg-quick@wg0.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/proton-port
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

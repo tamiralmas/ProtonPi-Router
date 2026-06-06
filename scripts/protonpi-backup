@@ -1,0 +1,33 @@
+#!/bin/bash
+set -e
+
+BACKUP_DIR="/var/lib/protonpi-dashboard/backups"
+mkdir -p "$BACKUP_DIR"
+chmod 700 "$BACKUP_DIR"
+
+OUT="$BACKUP_DIR/protonpi-backup-$(date +%F-%H%M%S).tar.gz"
+
+tar -czf "$OUT" \
+  /etc/protonvpn-profiles \
+  /etc/wireguard \
+  /opt/vpn-dashboard \
+  /etc/systemd/system/vpn-dashboard.service \
+  /etc/systemd/system/vpn-dashboard-https.service \
+  /etc/systemd/system/vpn-dashboard-redirect.service \
+  /etc/systemd/system/vpn-autostart.service \
+  /etc/systemd/system/vpn-watchdog.service \
+  /etc/systemd/system/vpn-watchdog.timer \
+  /etc/systemd/system/proton-port.service \
+  /usr/local/sbin/vpn-profile \
+  /usr/local/sbin/proton-port \
+  /usr/local/sbin/vpn-watchdog \
+  /usr/local/sbin/protonpi-backup \
+  /usr/local/sbin/protonpi-health \
+  /usr/local/sbin/protonpi-device-control \
+  /usr/local/sbin/protonpi-apply-limits \
+  /etc/iptables/rules.v4 \
+  /etc/iptables/rules.v6 \
+  /etc/protonpi-dashboard \
+  2>/dev/null || true
+
+echo "$OUT"

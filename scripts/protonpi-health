@@ -1,0 +1,37 @@
+#!/bin/bash
+
+ping_ms() {
+  ping -c 3 -W 1 "$1" 2>/dev/null | awk -F'/' '/rtt/ {print $5}'
+}
+
+HANDSHAKE=$(wg show wg0 latest-handshakes 2>/dev/null | awk '{print $2}' | head -n1)
+NOW=$(date +%s)
+
+if [ -z "$HANDSHAKE" ] || [ "$HANDSHAKE" = "0" ]; then
+  AGE=9999
+else
+  AGE=$((NOW-HANDSHAKE))
+fi
+
+PING_INTERNET=$(ping_ms 1.1.1.1)
+PING_PROTON=$(ping_ms 10.2.0.1)
+
+SCORE=100
+
+if [ "$AGE" -gt 180 ]; then SCORE=$((SCORE-40)); fi
+if [ -z "$PING_INTERNET" ]; then SCORE=$((SCORE-25)); fi
+if [ -z "$PING_PROTON" ]; then SCORE=$((SCORE-20)); fi
+
+TEMP_RAW=$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo 0)
+TEMP=$((TEMP_RAW/1000))
+if [ "$TEMP" -gt 75 ]; then SCORE=$((SCORE-10)); fi
+
+if [ "$SCORE" -lt 0 ]; then SCORE=0; fi
+
+echo "{"
+echo "  \"score\": $SCORE,"
+echo "  \"handshake_age\": $AGE,"
+echo "  \"internet_ping_ms\": \"${PING_INTERNET:-}\","
+echo "  \"proton_ping_ms\": \"${PING_PROTON:-}\","
+echo "  \"cpu_temp_c\": $TEMP"
+echo "}"

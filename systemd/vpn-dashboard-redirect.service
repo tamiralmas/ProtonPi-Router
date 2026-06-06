@@ -1,0 +1,13 @@
+[Unit]
+Description=Redirect ProtonPi HTTP to HTTPS
+After=NetworkManager.service vpn-dashboard-https.service
+Wants=NetworkManager.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/vpn-dashboard/redirect80.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

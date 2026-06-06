@@ -1,0 +1,29 @@
+#!/bin/bash
+
+GATEWAY="10.2.0.1"
+
+while true; do
+  echo "==== $(date) ===="
+
+  TCP_OUTPUT=$(timeout 20 natpmpc -a 1 0 tcp 60 -g "$GATEWAY" 2>&1)
+  echo "$TCP_OUTPUT"
+  TCP_PORT=$(echo "$TCP_OUTPUT" | awk '/Mapped public port/ {print $4}' | tail -n1)
+
+  UDP_OUTPUT=$(timeout 20 natpmpc -a 1 0 udp 60 -g "$GATEWAY" 2>&1)
+  echo "$UDP_OUTPUT"
+  UDP_PORT=$(echo "$UDP_OUTPUT" | awk '/Mapped public port/ {print $4}' | tail -n1)
+
+  if [ -n "$TCP_PORT" ]; then
+    echo "$TCP_PORT" > /run/proton-forwarded-tcp-port
+    date +"%Y-%m-%d %H:%M:%S" > /run/proton-forwarded-updated
+    echo "Saved TCP port: $TCP_PORT"
+  fi
+
+  if [ -n "$UDP_PORT" ]; then
+    echo "$UDP_PORT" > /run/proton-forwarded-udp-port
+    date +"%Y-%m-%d %H:%M:%S" > /run/proton-forwarded-updated
+    echo "Saved UDP port: $UDP_PORT"
+  fi
+
+  sleep 45
+done

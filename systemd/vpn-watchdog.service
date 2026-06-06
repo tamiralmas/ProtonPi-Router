@@ -1,0 +1,6 @@
+[Unit]
+Description=ProtonPi VPN health watchdog
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/vpn-watchdog

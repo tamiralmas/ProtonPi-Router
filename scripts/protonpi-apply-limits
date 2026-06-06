@@ -1,0 +1,46 @@
+#!/bin/bash
+
+POLICY="/etc/protonvpn-profiles/client-policies.json"
+DEV="wlan0"
+
+# If no policy file, clear limits and exit
+if [ ! -f "$POLICY" ]; then
+  tc qdisc del dev "$DEV" root 2>/dev/null || true
+  exit 0
+fi
+
+LIMITS=$(python3 - <<'PY'
+import json, re
+path="/etc/protonvpn-profiles/client-policies.json"
+try:
+    data=json.load(open(path))
+except Exception:
+    data={}
+for ip, policy in data.items():
+    m=re.search(r"Limit:\s*([0-9.]+)\s*Mbps", str(policy))
+    if m:
+        print(ip, m.group(1))
+PY
+)
+
+# Clear if no active limits
+if [ -z "$LIMITS" ]; then
+  tc qdisc del dev "$DEV" root 2>/dev/null || true
+  exit 0
+fi
+
+# Rebuild shaping tree
+tc qdisc del dev "$DEV" root 2>/dev/null || true
+tc qdisc add dev "$DEV" root handle 1: htb default 999
+tc class add dev "$DEV" parent 1: classid 1:1 htb rate 1000mbit ceil 1000mbit
+tc class add dev "$DEV" parent 1:1 classid 1:999 htb rate 1000mbit ceil 1000mbit
+
+ID=10
+echo "$LIMITS" | while read -r IP MBPS; do
+  [ -z "$IP" ] && continue
+  CLASS="1:$ID"
+  tc class add dev "$DEV" parent 1:1 classid "$CLASS" htb rate "${MBPS}mbit" ceil "${MBPS}mbit"
+  tc qdisc add dev "$DEV" parent "$CLASS" fq_codel
+  tc filter add dev "$DEV" protocol ip parent 1:0 prio "$ID" u32 match ip dst "$IP"/32 flowid "$CLASS"
+  ID=$((ID+1))
+done

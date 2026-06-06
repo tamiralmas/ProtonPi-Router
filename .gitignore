@@ -1,0 +1,25 @@
+# Secrets
+*.conf
+wg0.conf
+dashboard-auth.json
+dashboard-settings.json
+client-names.json
+client-policies.json
+*.key
+*.crt
+*.pem
+*.p12
+*.tar.gz
+
+# Python
+__pycache__/
+*.pyc
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
+
+# Runtime files
+*.log
+*.pid

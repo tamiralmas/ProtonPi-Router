@@ -1,0 +1,12 @@
+[Unit]
+Description=Start selected ProtonPi VPN profile
+After=NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c 'PROFILE=$(cat /etc/protonvpn-profiles/default-profile 2>/dev/null || echo gaming); /usr/local/sbin/vpn-profile "$PROFILE"'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,6 @@
+{
+  "fallback_profile": "gaming",
+  "reboot_day": "off",
+  "reboot_time": "04:00",
+  "profile_order": ["gaming", "p2p", "streaming", "maxsec", "off"]
+}

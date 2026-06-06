@@ -1,0 +1,17 @@
+[Unit]
+Description=ProtonPi VPN Dashboard HTTPS
+After=NetworkManager.service wg-quick@wg0.service
+Wants=NetworkManager.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/vpn-dashboard
+Environment=DASHBOARD_PORT=443
+Environment=DASHBOARD_SSL_CERT=/etc/protonpi-dashboard/certs/protonpi.crt
+Environment=DASHBOARD_SSL_KEY=/etc/protonpi-dashboard/certs/protonpi.key
+ExecStart=/usr/bin/python3 /opt/vpn-dashboard/app.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
