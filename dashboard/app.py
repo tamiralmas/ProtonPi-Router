@@ -2045,8 +2045,8 @@ def protonpi_cert():
 
 @app.route("/wifi-qr.png")
 def wifi_qr():
-    ssid="Pi-Proton-VPN"
-    password="DevVPN123"
+    ssid="Pi-VPN-Router"
+    password="Password"
     wifi=f"WIFI:T:WPA;S:{ssid};P:{password};;"
     png=run(["sh","-c",f"qrencode -t PNG -o - '{wifi}' | base64 -w0"],5)
     return Response(base64.b64decode(png),mimetype="image/png")
