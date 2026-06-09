@@ -2,84 +2,92 @@
 set -e
 
 PROFILE="$1"
+PROFILE_DIR="/etc/protonvpn-profiles"
+WG_CONF="/etc/wireguard/wg0.conf"
+
+usage() {
+  echo "Usage: sudo vpn-profile gaming|p2p|streaming|maxsec|<imported-profile>|status|off"
+}
+
+show_status() {
+  echo "WireGuard status:"
+  wg || true
+  echo
+
+  echo "IPv4:"
+  curl -4 -s --max-time 5 ifconfig.me || true
+  echo
+
+  if systemctl is-active --quiet proton-port.service; then
+    echo "Proton port forwarding: active"
+    echo -n "TCP port: "
+    cat /run/proton-forwarded-tcp-port 2>/dev/null || echo "not assigned yet"
+    echo -n "UDP port: "
+    cat /run/proton-forwarded-udp-port 2>/dev/null || echo "not assigned yet"
+  else
+    echo "Proton port forwarding: inactive"
+  fi
+}
+
+if [ -z "$PROFILE" ]; then
+  usage
+  exit 1
+fi
 
 case "$PROFILE" in
-  gaming)
-    CONFIG="/etc/protonvpn-profiles/gaming.conf"
-    ;;
-  p2p)
-    CONFIG="/etc/protonvpn-profiles/p2p.conf"
-    ;;
-  maxsec)
-    CONFIG="/etc/protonvpn-profiles/maxsec.conf"
-    ;;
-  streaming)
-    CONFIG="/etc/protonvpn-profiles/streaming.conf"
-    ;;
   status)
-    echo "WireGuard status:"
-    wg || true
-    echo
-    echo "IPv4:"
-    curl -4 --max-time 5 -s https://api.ipify.org || curl -4 --max-time 5 -s https://ifconfig.me/ip || true
-    echo
-    if systemctl is-active --quiet proton-port.service; then
-      echo "Proton port forwarding: active"
-      echo -n "TCP port: "
-      cat /run/proton-forwarded-tcp-port 2>/dev/null || echo "not assigned yet"
-      echo -n "UDP port: "
-      cat /run/proton-forwarded-udp-port 2>/dev/null || echo "not assigned yet"
-    else
-      echo "Proton port forwarding: inactive"
-    fi
+    show_status
     exit 0
     ;;
   off)
     systemctl stop proton-port.service 2>/dev/null || true
-    systemctl stop wg-quick@wg0 2>/dev/null || true
-    rm -f /run/proton-forwarded-tcp-port /run/proton-forwarded-udp-port /run/proton-forwarded-updated
-    echo "off" > /run/vpn-profile-current
+    wg-quick down wg0 2>/dev/null || true
+    echo "off" > /run/vpn-profile-current 2>/dev/null || true
+    echo "off" > "$PROFILE_DIR/current-profile" 2>/dev/null || true
     echo "VPN stopped."
     exit 0
     ;;
-  *)
-    echo "Use: sudo vpn-profile gaming|p2p|maxsec|streaming|status|off"
-    exit 1
-    ;;
 esac
 
+if ! echo "$PROFILE" | grep -Eq '^[A-Za-z0-9._-]+$'; then
+  echo "Invalid profile name."
+  exit 1
+fi
+
+CONFIG="$PROFILE_DIR/$PROFILE.conf"
+
 if [ ! -f "$CONFIG" ]; then
-  echo "Missing config: $CONFIG"
+  echo "Profile not found: $PROFILE"
+  echo
+  echo "Available profiles:"
+  find "$PROFILE_DIR" -maxdepth 1 -type f -name "*.conf" -printf "  %f\n" | sed 's/\.conf$//'
   exit 1
 fi
 
 systemctl stop proton-port.service 2>/dev/null || true
-systemctl stop wg-quick@wg0 2>/dev/null || true
+wg-quick down wg0 2>/dev/null || true
 
-rm -f /run/proton-forwarded-tcp-port /run/proton-forwarded-udp-port /run/proton-forwarded-updated
+cp "$CONFIG" "$WG_CONF"
+chmod 600 "$WG_CONF"
+chown root:root "$WG_CONF"
 
-cp "$CONFIG" /etc/wireguard/wg0.conf
-chmod 600 /etc/wireguard/wg0.conf
+wg-quick up wg0
 
-systemctl start wg-quick@wg0
-
-# Required because your home LAN 10.0.0.0/8 overlaps Proton's 10.2.0.1 NAT-PMP gateway
+# Needed for Proton NAT-PMP port forwarding when enabled.
 ip route replace 10.2.0.1 dev wg0 2>/dev/null || true
 
-echo "$PROFILE" > /run/vpn-profile-current
-
-if [ "$PROFILE" = "p2p" ]; then
-  systemctl start proton-port.service
-fi
+echo "$PROFILE" > /run/vpn-profile-current 2>/dev/null || true
+echo "$PROFILE" > "$PROFILE_DIR/current-profile" 2>/dev/null || true
 
 echo "Active profile: $PROFILE"
 echo "IPv4:"
-curl -4 --max-time 5 -s https://api.ipify.org || curl -4 --max-time 5 -s https://ifconfig.me/ip || true
+curl -4 -s --max-time 8 ifconfig.me || true
 echo
 
-if [ "$PROFILE" = "p2p" ]; then
+if [ "$PROFILE" = "p2p" ] || grep -Eiq "nat-pmp|port forwarding|port-forwarding|portforwarding" "$CONFIG"; then
+  systemctl restart proton-port.service 2>/dev/null || true
+  sleep 3
   echo "Waiting for Proton forwarded port..."
-  sleep 8
   echo -n "TCP port: "
   cat /run/proton-forwarded-tcp-port 2>/dev/null || echo "not assigned yet"
   echo -n "UDP port: "

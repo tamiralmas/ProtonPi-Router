@@ -249,6 +249,219 @@ HTML = r"""
       .detailGrid { grid-template-columns:1fr; }
       .settingsRow { grid-template-columns:1fr; }
     }
+  
+    #profileButtons {
+      display:grid !important;
+      grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+      gap:10px;
+      align-items:stretch;
+    }
+    #profileButtons button {
+      width:100%;
+      min-height:44px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      white-space:normal;
+    }
+    select, option {
+      background:#111827;
+      color:#f4f7fb;
+    }
+
+  
+    #profileButtons {
+      display:grid !important;
+      grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+      gap:10px;
+      align-items:stretch;
+    }
+    #profileButtons button {
+      width:100%;
+      min-height:46px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      white-space:normal;
+    }
+    #profileButtons button.activeProfileBtn {
+      outline:2px solid rgba(255,255,255,.72);
+      box-shadow:0 0 0 4px rgba(255,255,255,.08);
+    }
+    select, option {
+      background:#111827 !important;
+      color:#f4f7fb !important;
+    }
+    .profileManager {
+      display:grid;
+      gap:8px;
+      margin-top:8px;
+    }
+    .profileManageCard {
+      display:grid;
+      grid-template-columns:auto 1fr auto auto;
+      gap:10px;
+      align-items:center;
+      padding:10px;
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      background:rgba(255,255,255,.04);
+    }
+    .profileColorDot {
+      width:14px;
+      height:14px;
+      border-radius:50%;
+    }
+    .profileManageText {
+      display:flex;
+      flex-direction:column;
+      gap:2px;
+      min-width:0;
+    }
+    .profileManageText span {
+      color:var(--muted);
+      font-size:12px;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .profileBadge {
+      font-size:11px;
+      color:var(--muted);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:999px;
+      padding:4px 8px;
+    }
+    .activeBadge {
+      color:var(--good);
+      border-color:rgba(53,208,127,.35);
+    }
+    .dangerBtn {
+      border-color:rgba(255,92,122,.35) !important;
+    }
+
+  
+    #profileButtons {
+      display:grid !important;
+      grid-template-columns:repeat(auto-fit,minmax(132px,1fr));
+      gap:10px;
+      align-items:stretch;
+    }
+    #profileButtons button {
+      width:100%;
+      min-height:46px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      white-space:normal;
+    }
+    #profileButtons button.activeProfileBtn {
+      outline:2px solid rgba(255,255,255,.72);
+      box-shadow:0 0 0 4px rgba(255,255,255,.08);
+    }
+    .profileImportBox {
+      display:grid;
+      gap:12px;
+      padding:12px;
+      border-radius:16px;
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.08);
+    }
+    .profileImportGrid {
+      display:grid;
+      grid-template-columns:1fr auto auto;
+      gap:10px;
+      align-items:end;
+    }
+    .profileImportGrid input[type="file"] {
+      max-width:100%;
+    }
+    select, option {
+      background:#111827 !important;
+      color:#f4f7fb !important;
+    }
+    .profileManager {
+      display:grid;
+      gap:8px;
+      margin-top:8px;
+    }
+    .profileManageCard {
+      display:grid;
+      grid-template-columns:auto 1fr auto auto;
+      gap:10px;
+      align-items:center;
+      padding:10px;
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      background:rgba(255,255,255,.04);
+    }
+    .profileColorDot {
+      width:14px;
+      height:14px;
+      border-radius:50%;
+    }
+    .profileManageText {
+      display:flex;
+      flex-direction:column;
+      gap:2px;
+      min-width:0;
+    }
+    .profileManageText span {
+      color:var(--muted);
+      font-size:12px;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .profileBadge {
+      font-size:11px;
+      color:var(--muted);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:999px;
+      padding:4px 8px;
+    }
+    .activeBadge {
+      color:var(--good);
+      border-color:rgba(53,208,127,.35);
+    }
+    .dangerBtn {
+      border-color:rgba(255,92,122,.35) !important;
+    }
+    @media(max-width:700px){
+      .profileImportGrid {
+        grid-template-columns:1fr;
+      }
+      .profileManageCard {
+        grid-template-columns:auto 1fr auto;
+      }
+      .profileManageCard .dangerBtn {
+        grid-column:1 / -1;
+      }
+    }
+
+  
+    .profileManagerCompact {
+      display:grid;
+      grid-template-columns:1fr auto;
+      gap:10px;
+      align-items:end;
+      padding:12px;
+      border-radius:16px;
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.08);
+    }
+    .profileManagerCompact select {
+      width:100%;
+    }
+    @media(max-width:700px){
+      .profileManagerCompact {
+        grid-template-columns:1fr;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -371,6 +584,27 @@ HTML = r"""
 
     <br>
     <h2>Profiles</h2>
+
+    <div class="profileImportBox">
+      <div>
+        <h2 style="margin-bottom:6px;">Import VPN Profile</h2>
+        <div class="small">Upload a Proton WireGuard <code>.conf</code>. The dashboard will create a new VPN button automatically.</div>
+      </div>
+
+      <div class="profileImportGrid">
+        <label class="small">Config file<br><input id="importConfigFile" type="file" accept=".conf,.txt"></label>
+        <label class="small">Button color<br><input id="importConfigColor" type="color" value="#4f8cff" title="Button color"></label>
+        <button class="ghost" onclick="importVpnConfig()">Import Profile</button>
+      </div>
+
+      <div id="importConfigStatus" class="small">No file selected.</div>
+    </div>
+
+    <br>
+    <div class="label">Profile manager</div>
+    <div id="profileManageList" class="small">—</div>
+
+    <br>
     <div class="label">Startup profile</div>
     <select id="startupProfile" onchange="setStartupProfile(this.value)">
       <option value="gaming">Gaming on boot</option>
@@ -553,6 +787,9 @@ const PROFILE_CLASSES = {
   maxsec:"maxsec",
   off:"off"
 };
+let profileButtonsRenderKey = "";
+let lastProfilesCache = [];
+
 const PROFILE_NOTES = {
   gaming:"Low-latency profile for gaming and general use. Best when you care about ping.",
   p2p:"P2P profile with Proton port forwarding. Use the displayed port in your torrent/P2P app.",
@@ -571,18 +808,37 @@ function profileOrderFromSettings(settings){
 }
 
 function renderProfileButtons(order){
-  $("profileButtons").innerHTML = order.map(p => 
-    `<button class="${PROFILE_CLASSES[p]}" onclick="setProfile('${p}')">${PROFILE_LABELS[p]}</button>`
-  ).join("");
+  // Do not blank the VPN buttons every refresh. That caused the jumping/disappearing.
+  if(!$("profileButtons").children.length){
+    $("profileButtons").innerHTML = (order || ["gaming","p2p","streaming","maxsec","off"]).map(p => {
+      const label = PROFILE_LABELS[p] || p;
+      const cls = PROFILE_CLASSES[p] || "dynamicProfileBtn";
+      return `<button class="${cls}" onclick="setProfile('${p}')">${label}</button>`;
+    }).join("");
+  }
+  refreshVpnProfileButtons(order || []);
 }
 
 async function setProfile(profile){
   setText("vpn","Switching...");
-  const r = await fetch("/api/profile",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({profile})});
+
+  const r = await fetch("/api/profile", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({profile})
+  });
+
   const j = await r.json();
-  if(!j.ok) alert(j.error || "Failed");
-  samples=[]; last=null;
-  setTimeout(load,1800);
+
+  if(!j.ok){
+    alert(j.error || "Failed");
+    load();
+    return;
+  }
+
+  samples=[];
+  last=null;
+  setTimeout(()=>{ refreshVpnProfileButtons([], true); load(); }, 1800);
 }
 
 async function setStartupProfile(profile){
@@ -713,6 +969,189 @@ async function restoreSelectedBackup(){
   setTimeout(()=>location.reload(), 1500);
 }
 
+
+
+
+function htmlEscape(x){
+  return String(x ?? "").replace(/[&<>"']/g, ch => ({
+    "&":"&amp;",
+    "<":"&lt;",
+    ">":"&gt;",
+    '"':"&quot;",
+    "'":"&#39;"
+  }[ch]));
+}
+
+function safeColor(c){
+  return /^#[0-9a-fA-F]{6}$/.test(String(c || "")) ? c : "#4f8cff";
+}
+
+
+function htmlEscape(x){
+  return String(x ?? "").replace(/[&<>"']/g, ch => ({
+    "&":"&amp;",
+    "<":"&lt;",
+    ">":"&gt;",
+    '"':"&quot;",
+    "'":"&#39;"
+  }[ch]));
+}
+
+function safeColor(c){
+  return /^#[0-9a-fA-F]{6}$/.test(String(c || "")) ? c : "#4f8cff";
+}
+
+async function refreshVpnProfileButtons(preferredOrder=[], force=false){
+  try{
+    const r = await fetch("/api/profiles?ts=" + Date.now());
+    const j = await r.json();
+    if(!j.ok) return;
+
+    const orderIndex = new Map((preferredOrder || []).map((x,i)=>[x,i]));
+    let profiles = j.profiles.slice();
+
+    if(!profiles.some(p => p.name === "off")){
+      profiles.push({name:"off", label:"Off", core:true, color:"#6b7280", active:false});
+    }
+
+    profiles.sort((a,b)=>{
+      const ai = orderIndex.has(a.name) ? orderIndex.get(a.name) : 999;
+      const bi = orderIndex.has(b.name) ? orderIndex.get(b.name) : 999;
+      if(ai !== bi) return ai - bi;
+      if(a.name === "off") return 1;
+      if(b.name === "off") return -1;
+      if(a.core !== b.core) return a.core ? -1 : 1;
+      return String(a.label || a.name).localeCompare(String(b.label || b.name));
+    });
+
+    lastProfilesCache = profiles;
+
+    const renderKey = JSON.stringify(profiles.map(p => ({
+      name:p.name,
+      label:p.label,
+      color:p.color,
+      active:p.active
+    })));
+
+    if(force || renderKey !== profileButtonsRenderKey){
+      profileButtonsRenderKey = renderKey;
+
+      const box = $("profileButtons");
+      box.innerHTML = "";
+
+      for(const p of profiles){
+        const btn = document.createElement("button");
+        btn.textContent = p.label || p.name;
+        btn.dataset.profile = p.name;
+
+        if(PROFILE_CLASSES[p.name]){
+          btn.className = PROFILE_CLASSES[p.name] || "";
+        } else {
+          btn.className = "dynamicProfileBtn";
+          btn.style.background = safeColor(p.color);
+          btn.style.borderColor = safeColor(p.color);
+          btn.style.color = "#fff";
+        }
+
+        if(p.active){
+          btn.classList.add("activeProfileBtn");
+        }
+
+        btn.onclick = () => setProfile(p.name);
+        box.appendChild(btn);
+      }
+    }
+
+    renderProfileManager(profiles.filter(p => p.name !== "off"));
+  } catch(e){}
+}
+
+function renderProfileManager(profiles){
+  const box = $("profileManageList");
+  if(!box) return;
+
+  const deletable = profiles.filter(p => p.name !== "off");
+
+  if(!deletable.length){
+    box.innerHTML = "No profiles found.";
+    return;
+  }
+
+  box.innerHTML = `
+    <div class="profileManagerCompact">
+      <select id="deleteProfileSelect">
+        ${deletable.map(p => `<option value="${htmlEscape(p.name)}">${htmlEscape(p.label || p.name)} (${htmlEscape(p.name)}.conf)${p.active ? " — active" : ""}</option>`).join("")}
+      </select>
+      <button class="ghost dangerBtn" onclick="deleteSelectedProfile()">Delete Selected Profile</button>
+    </div>
+    <div class="small" style="margin-top:8px;">Deleting moves the config to <code>deleted-profiles</code>. If the selected profile is active, VPN will be turned off first.</div>
+  `;
+}
+
+async function deleteSelectedProfile(){
+  const sel = $("deleteProfileSelect");
+  if(!sel || !sel.value){
+    alert("Select a profile first.");
+    return;
+  }
+  await deleteProfile(sel.value);
+}
+
+async function importVpnConfig(){
+  const fileInput = $("importConfigFile");
+  const colorInput = $("importConfigColor");
+  const status = $("importConfigStatus");
+
+  if(!fileInput.files || !fileInput.files[0]){
+    alert("Choose a WireGuard .conf file first.");
+    return;
+  }
+
+  const fd = new FormData();
+  fd.append("config", fileInput.files[0]);
+  fd.append("color", colorInput ? colorInput.value : "#4f8cff");
+
+  status.innerText = "Importing...";
+
+  try{
+    const r = await fetch("/api/import-config", {
+      method:"POST",
+      body:fd
+    });
+
+    const j = await r.json();
+
+    if(j.ok){
+      status.innerText = j.message;
+      alert(j.message + "\n\nA new VPN button has been added.");
+      fileInput.value = "";
+      await refreshVpnProfileButtons();
+    } else {
+      status.innerText = j.error || "Import failed.";
+      alert(j.error || "Import failed.");
+    }
+  } catch(e){
+    status.innerText = "Import failed.";
+    alert("Import failed: " + e);
+  }
+}
+
+async function deleteProfile(profile){
+  if(!confirm("Delete profile '" + profile + "'?\n\nThe config will be moved to deleted-profiles as a backup.")){
+    return;
+  }
+
+  const r = await fetch("/api/delete-profile", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({profile})
+  });
+
+  const j = await r.json();
+  alert(j.ok ? j.message : (j.error || "Delete failed"));
+  await refreshVpnProfileButtons();
+}
+
 async function importSettingsPrompt(){
   const raw = prompt("Paste exported settings JSON:");
   if(!raw) return;
@@ -759,7 +1198,7 @@ async function load(){
 
   setText("currentIp", s.current_ip);
   setText("serverText", s.server || s.route);
-  setText("profile", s.profile);
+  setText("profile", s.profile_label || s.profile);
   setText("vpn", s.vpn_up ? "Connected" : "Disconnected");
   if(s.default_profile) $("startupProfile").value = s.default_profile;
   if(s.settings){
@@ -784,12 +1223,15 @@ async function load(){
   $("ethWarning").classList.toggle("hidden", !s.eth_warning);
   if(s.eth_warning) $("ethWarning").innerText = s.eth_warning;
   setText("profileUptime", s.profile_uptime);
-  setText("profileNote", PROFILE_NOTES[s.profile] || "—");
 
-  const p2p = s.profile === "p2p" && s.vpn_up;
-  document.querySelectorAll(".p2pOnly").forEach(x=>x.classList.toggle("hidden",!p2p));
-  setText("p2pPort", s.tcp_port);
-  setText("portAge", s.port_age_warning ? (s.port_age + " ⚠") : s.port_age);
+  const activeProfileInfo = lastProfilesCache.find(p => p.name === s.profile);
+  const activeLabel = activeProfileInfo ? (activeProfileInfo.label || activeProfileInfo.name) : s.profile;
+  setText("profileNote", PROFILE_NOTES[s.profile] || ("Active custom profile: " + activeLabel));
+
+  const hasPortForwarding = !!s.port_forwarding_supported;
+  document.querySelectorAll(".p2pOnly").forEach(x=>x.classList.toggle("hidden",!hasPortForwarding));
+  setText("p2pPort", hasPortForwarding ? (s.tcp_port || s.udp_port || "Waiting…") : "—");
+  setText("portAge", hasPortForwarding ? (s.port_age_warning ? ((s.port_age || "—") + " ⚠") : (s.port_age || "—")) : "—");
 
   setText("pingInternet", s.latency.internet_ms === null ? "—" : s.latency.internet_ms + " ms");
   setText("pingProton", s.latency.proton_ms === null ? "—" : s.latency.proton_ms + " ms");
@@ -858,26 +1300,76 @@ function toggleDeviceCard(el){
   if(icon) icon.innerText = el.classList.contains("open") ? "−" : "+";
 }
 
+const openDeviceCards = new Set();
+
+function deviceKey(c){
+  return c.mac && c.mac !== "unknown" ? c.mac : c.ip;
+}
+
+function toggleDeviceCardById(id, key){
+  const el = document.getElementById(id);
+  if(!el) return;
+
+  const isOpen = el.classList.toggle("open");
+
+  if(isOpen) openDeviceCards.add(key);
+  else openDeviceCards.delete(key);
+
+  const icon = el.querySelector(".deviceChevron");
+  if(icon) icon.innerText = isOpen ? "−" : "+";
+}
+
+function clientScore(c){
+  let score = 0;
+  if((c.ip || "").startsWith("10.42.")) score += 100;
+  if((c.state || "").toUpperCase() === "REACHABLE") score += 50;
+  if(Number(c.rx || 0) > 0 || Number(c.tx || 0) > 0) score += 10;
+  return score;
+}
+
+function dedupeClients(clients){
+  const map = new Map();
+
+  for(const c of clients){
+    const mac = (c.mac || "").toLowerCase();
+    const key = mac && mac !== "unknown" ? mac : c.ip;
+
+    if(!map.has(key) || clientScore(c) > clientScore(map.get(key))){
+      map.set(key, c);
+    }
+  }
+
+  return Array.from(map.values()).sort((a,b)=>{
+    return clientScore(b) - clientScore(a);
+  });
+}
+
 function renderClients(clients){
+  clients = dedupeClients(clients || []);
+
   if(clients.length){
     $("clientList").innerHTML = clients.map((c, idx)=>{
       const name = c.name || ("Device " + c.ip);
       const policy = c.policy ? `<br>Policy: ${c.policy}` : "";
-      return `<div class="client" id="client-${idx}">
-        <div class="deviceHeader" onclick="toggleDeviceCard(document.getElementById('client-${idx}'))">
+      const key = deviceKey(c);
+      const id = "client-" + idx;
+      const opened = openDeviceCards.has(key);
+
+      return `<div class="client ${opened ? "open" : ""}" id="${id}">
+        <div class="deviceHeader" onclick="toggleDeviceCardById('${id}','${key}')">
           <div>
             <div class="clientName">${name}</div>
             <div class="clientMeta">${c.ip} · ${c.mac} · ${c.state}<br>Approx RX/TX: ${fmtBytes(c.rx)} / ${fmtBytes(c.tx)}${policy}</div>
           </div>
-          <div class="deviceChevron">+</div>
+          <div class="deviceChevron">${opened ? "−" : "+"}</div>
         </div>
         <div class="profiles deviceActions">
-          <button class="ghost miniBtn" onclick="renameClient('${c.mac}','${c.ip}')">Rename</button>
-          <button class="ghost miniBtn" onclick="deviceControl('block','${c.ip}')">Block</button>
-          <button class="ghost miniBtn" onclick="deviceControl('unblock','${c.ip}')">Unblock</button>
-          <button class="ghost miniBtn" onclick="deviceControl('prioritize','${c.ip}')">Prioritize</button>
-          <button class="ghost miniBtn" onclick="limitDevice('${c.ip}')">Limit</button>
-          <button class="ghost miniBtn" onclick="deviceControl('clear_limit','${c.ip}')">Clear Policy</button>
+          <button class="ghost miniBtn" onclick="event.stopPropagation(); renameClient('${c.mac}','${c.ip}')">Rename</button>
+          <button class="ghost miniBtn" onclick="event.stopPropagation(); deviceControl('block','${c.ip}')">Block</button>
+          <button class="ghost miniBtn" onclick="event.stopPropagation(); deviceControl('unblock','${c.ip}')">Unblock</button>
+          <button class="ghost miniBtn" onclick="event.stopPropagation(); deviceControl('prioritize','${c.ip}')">Prioritize</button>
+          <button class="ghost miniBtn" onclick="event.stopPropagation(); limitDevice('${c.ip}')">Limit</button>
+          <button class="ghost miniBtn" onclick="event.stopPropagation(); deviceControl('clear_limit','${c.ip}')">Clear Policy</button>
         </div>
       </div>`;
     }).join("");
@@ -1661,13 +2153,47 @@ def index():
         return redirect("/login")
     return render_template_string(HTML)
 
+
+
+def proton_port_service_active():
+    try:
+        r = subprocess.run(["systemctl", "is-active", "--quiet", "proton-port.service"], timeout=3)
+        return r.returncode == 0
+    except Exception:
+        return False
+
+def active_profile_supports_port_forwarding(profile):
+    if not profile or profile == "off":
+        return False
+
+    if profile == "p2p":
+        return True
+
+    path = os.path.join(PROFILE_DIR, profile + ".conf")
+    try:
+        text = open(path, "r", errors="ignore").read().lower()
+    except Exception:
+        return False
+
+    for line in text.splitlines():
+        clean = line.strip().lower()
+        if not clean:
+            continue
+
+        if "nat-pmp" in clean or "port forwarding" in clean or "port-forwarding" in clean or "portforwarding" in clean:
+            if any(x in clean for x in ["off", "false", "disabled", "no"]):
+                continue
+            return True
+
+    return False
+
 @app.route("/api/status")
 def status():
     auth = require_control_auth()
     if auth: return auth
     wg_raw=run(["wg"],3)
     vpn_up="interface: wg0" in wg_raw
-    profile=read("/run/vpn-profile-current") or "unknown"
+    profile=current_profile_name() or read("/run/vpn-profile-current") or "unknown"
     age_sec=port_age_seconds()
     cl=clients()
     wg=iface_bytes("wg0")
@@ -1677,6 +2203,7 @@ def status():
     return jsonify({
         "time":time.time(),
         "profile":profile,
+        "profile_label":read_profile_display(profile),
         "profile_uptime":profile_uptime(),
         "default_profile":default_profile(),
         "eth_warning":eth_warning(),
@@ -1688,10 +2215,11 @@ def status():
         "server":server_detail() if vpn_up else None,
         "profile_details":profile_details() if vpn_up else {},
         "route":run(["sh","-c","ip route | grep default | head -n1"],2),
-        "tcp_port":read("/run/proton-forwarded-tcp-port") if profile=="p2p" and vpn_up else None,
-        "udp_port":read("/run/proton-forwarded-udp-port") if profile=="p2p" and vpn_up else None,
-        "port_age":port_age() if profile=="p2p" and vpn_up else None,
-        "port_age_warning": True if (profile=="p2p" and vpn_up and age_sec is not None and age_sec > 70) else False,
+        "tcp_port":read("/run/proton-forwarded-tcp-port") if active_profile_supports_port_forwarding(profile) and vpn_up and proton_port_service_active() else None,
+        "udp_port":read("/run/proton-forwarded-udp-port") if active_profile_supports_port_forwarding(profile) and vpn_up and proton_port_service_active() else None,
+        "port_age":port_age() if active_profile_supports_port_forwarding(profile) and vpn_up and proton_port_service_active() else None,
+        "port_age_warning": True if (active_profile_supports_port_forwarding(profile) and vpn_up and proton_port_service_active() and age_sec is not None and age_sec > 70) else False,
+        "port_forwarding_supported": active_profile_supports_port_forwarding(profile) and vpn_up,
         "interfaces":{"eth0":iface_bytes("eth0"),"wlan0":iface_bytes("wlan0"),"wg0":wg},
         "totals":traffic_totals(wg),
         "machine":{"cpu_percent":cpu_percent(),"cpu_temp_c":temp,"mem_used_percent":mem_percent(),"disk_used_percent":disk_percent(),"uptime":uptime()},
@@ -1709,9 +2237,15 @@ def profile():
     if auth: return auth
     if blocked_when_locked():
         return jsonify({"ok":False,"error":"Dashboard is locked or read-only"}),403
-    p=request.get_json(force=True).get("profile","")
-    if p not in ["gaming","p2p","maxsec","streaming","off"]:
-        return jsonify({"ok":False,"error":"Invalid profile"}),400
+
+    p=request.get_json(force=True).get("profile","").strip()
+
+    if p != "off":
+        if not re.match(r"^[A-Za-z0-9._-]+$", p):
+            return jsonify({"ok":False,"error":"Invalid profile"}),400
+        if not os.path.exists(os.path.join(PROFILE_DIR, p + ".conf")):
+            return jsonify({"ok":False,"error":"Profile config not found"}),404
+
     out=run(["/usr/local/sbin/vpn-profile",p],50)
     return jsonify({"ok":True,"output":out})
 
@@ -1949,6 +2483,354 @@ def api_lock():
     save_settings(settings)
     return jsonify({"ok": True, "settings": settings})
 
+
+
+
+def profile_display_from_conf(text, fallback):
+    skip_words = [
+        "netshield", "moderate nat", "nat-pmp", "port forwarding",
+        "vpn accelerator", "secure core", "protocol", "platform",
+        "generated", "wireguard", "router"
+    ]
+
+    # Prefer explicit name-like comments inside the config.
+    for line in text.splitlines():
+        raw = line.strip()
+        if not raw:
+            continue
+
+        if raw.startswith("#"):
+            val = raw.lstrip("#").strip()
+            low = val.lower()
+            if not val:
+                continue
+            if any(w in low for w in skip_words):
+                continue
+            if len(val) <= 64:
+                return val
+
+        if raw.lower().startswith("name") and "=" in raw:
+            val = raw.split("=", 1)[1].strip()
+            if val:
+                return val[:64]
+
+    # Fallback to Endpoint host if useful.
+    for line in text.splitlines():
+        raw = line.strip()
+        if raw.lower().startswith("endpoint") and "=" in raw:
+            val = raw.split("=", 1)[1].strip().split(":")[0].strip("[]")
+            if val:
+                return val[:64]
+
+    return fallback
+
+def slugify_profile_name(name):
+    name = name.strip().lower()
+    name = re.sub(r"[^a-z0-9._-]+", "-", name)
+    name = re.sub(r"-+", "-", name).strip("-._")
+    if not name:
+        name = "imported-profile"
+    return name[:40]
+
+def read_profile_display(profile):
+    path = os.path.join("/etc/protonvpn-profiles", profile + ".conf")
+    try:
+        text = open(path, "r", errors="ignore").read()
+        return profile_display_from_conf(text, profile)
+    except Exception:
+        return profile
+
+
+PROFILE_DIR = "/etc/protonvpn-profiles"
+PROFILE_META_PATH = os.path.join(PROFILE_DIR, "profile-meta.json")
+CORE_PROFILES = ["gaming", "p2p", "streaming", "maxsec"]
+CORE_LABELS = {
+    "gaming": "Gaming",
+    "p2p": "P2P",
+    "streaming": "Streaming",
+    "maxsec": "Max Security"
+}
+
+def clean_profile_label(value, fallback="Imported Profile"):
+    value = str(value or "").replace("\\n", " ").replace("\n", " ").replace("\r", " ")
+    value = re.sub(r"\s+", " ", value).strip(" #:\t")
+    value = re.sub(r"(?i)^key\s+for\s+", "", value).strip()
+    value = re.sub(r"(?i)^wireguard\s+config\s+for\s+", "", value).strip()
+    if not value:
+        value = fallback
+    return value[:48]
+
+def profile_display_from_conf(text, fallback):
+    fallback = clean_profile_label(os.path.splitext(fallback or "Imported Profile")[0])
+
+    for line in text.splitlines():
+        raw = line.strip()
+        low = raw.lower()
+
+        if raw.startswith("#"):
+            val = raw.lstrip("#").strip()
+            vl = val.lower()
+
+            for prefix in ["name:", "profile:", "profile name:", "server:", "server name:"]:
+                if vl.startswith(prefix):
+                    return clean_profile_label(val.split(":", 1)[1], fallback)
+
+            m = re.match(r"(?i)^key\s+for\s+(.+)$", val)
+            if m:
+                return clean_profile_label(m.group(1), fallback)
+
+        if low.startswith("name") and "=" in raw:
+            return clean_profile_label(raw.split("=", 1)[1], fallback)
+
+    for line in text.splitlines():
+        raw = line.strip()
+        if raw.lower().startswith("endpoint") and "=" in raw:
+            host = raw.split("=", 1)[1].strip().split(":")[0].strip("[]")
+            if host:
+                return clean_profile_label(host.split(".")[0], fallback)
+
+    return fallback
+
+def slugify_profile_name(name):
+    name = clean_profile_label(name, "imported-profile").lower()
+    name = re.sub(r"[^a-z0-9._-]+", "-", name)
+    name = re.sub(r"-+", "-", name).strip("-._")
+    return (name or "imported-profile")[:40]
+
+def normalize_profile_color(color):
+    color = str(color or "").strip()
+    if re.match(r"^#[0-9a-fA-F]{6}$", color):
+        return color
+    return "#4f8cff"
+
+def load_profile_meta():
+    try:
+        with open(PROFILE_META_PATH, "r") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+    return {}
+
+def save_profile_meta(meta):
+    os.makedirs(PROFILE_DIR, exist_ok=True)
+    tmp = PROFILE_META_PATH + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(meta, f, indent=2, sort_keys=True)
+    os.chown(tmp, 0, 0)
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, PROFILE_META_PATH)
+
+def read_profile_display(profile):
+    if profile in CORE_LABELS:
+        return CORE_LABELS[profile]
+
+    meta = load_profile_meta()
+    if profile in meta and meta[profile].get("label"):
+        return clean_profile_label(meta[profile]["label"], profile)
+
+    path = os.path.join(PROFILE_DIR, profile + ".conf")
+    try:
+        text = open(path, "r", errors="ignore").read()
+        return profile_display_from_conf(text, profile)
+    except Exception:
+        return profile
+
+def current_profile_name():
+    try:
+        return open(os.path.join(PROFILE_DIR, "current-profile"), "r").read().strip()
+    except Exception:
+        return ""
+
+
+def profile_exists_for_activation(profile):
+    profile = str(profile or "").strip()
+    if profile == "off":
+        return True
+    if not re.match(r"^[A-Za-z0-9._-]+$", profile):
+        return False
+    return os.path.exists(os.path.join(PROFILE_DIR, profile + ".conf"))
+
+@app.route("/api/profiles")
+def api_profiles():
+    auth = require_control_auth()
+    if auth: return auth
+
+    meta = load_profile_meta()
+    active = current_profile_name()
+    profiles = []
+
+    try:
+        names = []
+        for fname in os.listdir(PROFILE_DIR):
+            if not fname.endswith(".conf"):
+                continue
+            name = fname[:-5]
+            if re.match(r"^[A-Za-z0-9._-]+$", name):
+                names.append(name)
+
+        ordered = [x for x in CORE_PROFILES if x in names]
+        ordered += sorted([x for x in names if x not in CORE_PROFILES])
+
+        changed = False
+        for name in ordered:
+            core = name in CORE_PROFILES
+            if not core and name not in meta:
+                meta[name] = {
+                    "label": read_profile_display(name),
+                    "color": "#4f8cff",
+                    "imported": True
+                }
+                changed = True
+
+            profiles.append({
+                "name": name,
+                "label": read_profile_display(name),
+                "color": normalize_profile_color(meta.get(name, {}).get("color", "#4f8cff")),
+                "core": core,
+                "active": name == active
+            })
+
+        if changed:
+            save_profile_meta(meta)
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e), "profiles": []}), 500
+
+    return jsonify({"ok": True, "profiles": profiles})
+
+@app.route("/api/import-config", methods=["POST"])
+def api_import_config():
+    auth = require_control_auth()
+    if auth: return auth
+
+    uploaded = request.files.get("config")
+    if not uploaded:
+        return jsonify({"ok": False, "error": "No config file uploaded"}), 400
+
+    color = normalize_profile_color(request.form.get("color", "#4f8cff"))
+
+    raw = uploaded.read()
+    if len(raw) > 30000:
+        return jsonify({"ok": False, "error": "Config file is too large"}), 400
+
+    try:
+        text = raw.decode("utf-8")
+    except Exception:
+        return jsonify({"ok": False, "error": "Config must be a UTF-8 text file"}), 400
+
+    text = text.replace("\r\n", "\n").replace("\r", "\n").strip() + "\n"
+
+    required = ["[Interface]", "PrivateKey", "Address", "[Peer]", "PublicKey", "Endpoint", "AllowedIPs"]
+    missing = [x for x in required if x not in text]
+    if missing:
+        return jsonify({"ok": False, "error": "Missing required WireGuard fields: " + ", ".join(missing)}), 400
+
+    for line in text.splitlines():
+        clean = line.strip()
+        if not clean or clean.startswith("#"):
+            continue
+        key = clean.split("=", 1)[0].strip()
+        if key in ["PreUp", "PostUp", "PreDown", "PostDown"]:
+            return jsonify({"ok": False, "error": f"Rejected unsafe WireGuard directive: {key}"}), 400
+
+    fallback = os.path.splitext(uploaded.filename or "imported-profile")[0]
+    display = profile_display_from_conf(text, fallback)
+    slug = slugify_profile_name(display)
+
+    os.makedirs(PROFILE_DIR, exist_ok=True)
+
+    base = slug
+    n = 2
+    while os.path.exists(os.path.join(PROFILE_DIR, slug + ".conf")):
+        slug = f"{base}-{n}"
+        n += 1
+
+    dest = os.path.join(PROFILE_DIR, slug + ".conf")
+    tmp = dest + ".tmp"
+
+    text = f"# Name: {display}\n" + text
+
+    with open(tmp, "w") as f:
+        f.write(text)
+
+    os.chown(tmp, 0, 0)
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, dest)
+
+    meta = load_profile_meta()
+    meta[slug] = {"label": display, "color": color, "imported": True}
+    save_profile_meta(meta)
+
+    return jsonify({
+        "ok": True,
+        "message": f"Imported new profile: {display}",
+        "profile": slug,
+        "label": display,
+        "color": color
+    })
+
+@app.route("/api/delete-profile", methods=["POST"])
+def api_delete_profile():
+    auth = require_control_auth()
+    if auth: return auth
+
+    data = request.get_json(force=True)
+    profile = str(data.get("profile", "")).strip()
+
+    if not re.match(r"^[A-Za-z0-9._-]+$", profile):
+        return jsonify({"ok": False, "error": "Invalid profile name"}), 400
+
+    if profile == "off":
+        return jsonify({"ok": False, "error": "Off is not a profile file"}), 400
+
+    path = os.path.join(PROFILE_DIR, profile + ".conf")
+    if not os.path.exists(path):
+        return jsonify({"ok": False, "error": "Profile not found: " + profile}), 404
+
+    was_active = profile == current_profile_name()
+    if was_active:
+        try:
+            subprocess.run(["/usr/local/sbin/vpn-profile", "off"], timeout=25)
+        except Exception:
+            pass
+
+    deleted_dir = os.path.join(PROFILE_DIR, "deleted-profiles")
+    os.makedirs(deleted_dir, exist_ok=True)
+
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    deleted_path = os.path.join(deleted_dir, f"{profile}.{stamp}.conf")
+    shutil.move(path, deleted_path)
+
+    meta = load_profile_meta()
+    if profile in meta:
+        del meta[profile]
+        save_profile_meta(meta)
+
+    try:
+        settings = load_settings()
+        if settings.get("fallback_profile") == profile:
+            settings["fallback_profile"] = "off"
+        order = settings.get("profile_order", [])
+        if isinstance(order, list):
+            settings["profile_order"] = [x for x in order if x != profile]
+        save_settings(settings)
+    except Exception:
+        pass
+
+    try:
+        default_path = os.path.join(PROFILE_DIR, "default-profile")
+        if os.path.exists(default_path) and open(default_path).read().strip() == profile:
+            open(default_path, "w").write("off\n")
+    except Exception:
+        pass
+
+    return jsonify({
+        "ok": True,
+        "message": f"Deleted profile: {profile}" + (" and turned VPN off" if was_active else ""),
+        "deleted_to": os.path.basename(deleted_path)
+    })
 
 @app.route("/api/backups")
 def api_backups():
