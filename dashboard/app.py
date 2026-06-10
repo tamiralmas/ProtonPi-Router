@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from flask import Flask, jsonify, request, render_template_string, Response, redirect, make_response, session
-import subprocess, os, time, re, json, base64, socket, uuid, secrets
+import subprocess, os, time, re, json, base64, socket, uuid, secrets, shutil
 from werkzeug.security import check_password_hash, generate_password_hash
 
 app = Flask(__name__)
@@ -18,1531 +18,6 @@ CLIENT_POLICIES_FILE = "/etc/protonvpn-profiles/client-policies.json"
 DASHBOARD_BACKUP = "/opt/vpn-dashboard/app.py.localbackup"
 BACKUP_DIR = "/var/lib/protonpi-dashboard/backups"
 AUTH_FILE = "/etc/protonvpn-profiles/dashboard-auth.json"
-
-HTML = r"""
-<!doctype html>
-<html data-theme="blue">
-<head>
-  <title>ProtonPi</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <style>
-    :root {
-      --bg0:#05070d; --bg1:#070a12; --card:#111827; --card2:#182236;
-      --text:#f4f7fb; --muted:#91a0b6; --line:rgba(255,255,255,.10);
-      --primary:#4f8cff; --primary2:#7aa7ff; --good:#35d07f;
-      --warn:#ffd166; --bad:#ff5b6e; --shadow:rgba(0,0,0,.33);
-    }
-    html[data-theme="green"] {
-      --bg0:#03100b; --bg1:#06160f; --card:#0e241a; --card2:#133222;
-      --primary:#35d07f; --primary2:#7ff0b1;
-    }
-    html[data-theme="purple"] {
-      --bg0:#090514; --bg1:#10091f; --card:#1b1430; --card2:#291d45;
-      --primary:#9b6cff; --primary2:#c6a8ff;
-    }
-    html[data-theme="red"] {
-      --bg0:#140507; --bg1:#1d080c; --card:#30141a; --card2:#421b24;
-      --primary:#ff5b6e; --primary2:#ff9aa6;
-    }
-
-    * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-    body {
-      margin:0; color:var(--text);
-      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
-      background:
-        radial-gradient(circle at top left, color-mix(in srgb, var(--primary) 30%, transparent), transparent 38%),
-        radial-gradient(circle at top right, color-mix(in srgb, var(--primary2) 24%, transparent), transparent 34%),
-        linear-gradient(180deg,var(--bg1),var(--bg0));
-      padding:12px; padding-bottom:30px;
-    }
-    .app { max-width:900px; margin:0 auto; }
-    .top { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:8px 2px 14px; }
-    h1 { margin:0; font-size:29px; letter-spacing:-.9px; }
-    h2 { margin:0 0 12px; font-size:17px; letter-spacing:-.2px; }
-    .sub { color:var(--muted); font-size:13px; margin-top:3px; }
-    .pill {
-      padding:8px 11px; border-radius:999px; font-size:13px; font-weight:850;
-      color:var(--good); background:color-mix(in srgb, var(--good) 14%, transparent);
-      border:1px solid color-mix(in srgb, var(--good) 35%, transparent);
-      white-space:nowrap;
-    }
-    .card {
-      background:linear-gradient(180deg,color-mix(in srgb,var(--card2) 92%, transparent),color-mix(in srgb,var(--card) 96%, transparent));
-      border:1px solid var(--line); border-radius:23px; padding:15px; margin-bottom:12px;
-      box-shadow:0 14px 34px var(--shadow);
-    }
-    .hero {
-      background:
-        linear-gradient(135deg,color-mix(in srgb,var(--primary) 25%, transparent),color-mix(in srgb,var(--primary2) 12%, transparent)),
-        linear-gradient(180deg,var(--card2),var(--card));
-    }
-    .label { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
-    .big { font-size:24px; font-weight:950; margin-top:5px; word-break:break-word; }
-    .small { color:var(--muted); font-size:12.5px; line-height:1.35; }
-    .grid { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
-    .grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; }
-    .stat {
-      background:rgba(255,255,255,.045); border:1px solid rgba(255,255,255,.075);
-      border-radius:16px; padding:12px; min-height:76px;
-    }
-    .stat.clickable { cursor:pointer; }
-    .stat.clickable:active { transform:scale(.985); }
-    .value { font-size:17px; font-weight:900; margin-top:7px; word-break:break-word; }
-    .profiles { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
-    button, select, input, a.btn {
-      border:0; border-radius:16px; padding:13px 10px; color:white; font-weight:900;
-      font-size:14px; cursor:pointer; min-height:48px; text-align:center; text-decoration:none;
-      max-width:100%;
-    }
-    input, select {
-      width:100%; max-width:100%; min-width:0;
-      background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12);
-      color:white;
-    }
-    input[type="time"] {
-      appearance:none;
-      -webkit-appearance:none;
-      padding-left:10px;
-      padding-right:10px;
-    }
-    button:active, a.btn:active { transform:scale(.98); }
-    .gaming { background:linear-gradient(135deg,#2f80ff,#5aa2ff); }
-    .p2p { background:linear-gradient(135deg,#13a664,#35d07f); }
-    .streaming { background:linear-gradient(135deg,#00a6ff,#00d4ff); }
-    .maxsec { background:linear-gradient(135deg,#7c4dff,#b085ff); }
-    .off { background:linear-gradient(135deg,#c7384a,#ff5b6e); }
-    .ghost { background:rgba(255,255,255,.075); border:1px solid rgba(255,255,255,.12); }
-    .danger { background:rgba(255,91,110,.16); border:1px solid rgba(255,91,110,.35); color:#ffb3bc; }
-    .warning {
-      background:rgba(255,209,102,.14); border:1px solid rgba(255,209,102,.35);
-      color:#ffe3a3; border-radius:16px; padding:12px; margin-bottom:12px; font-weight:850;
-    }
-    .badwarn {
-      background:rgba(255,91,110,.15); border:1px solid rgba(255,91,110,.35);
-      color:#ffb3bc; border-radius:16px; padding:12px; margin-bottom:12px; font-weight:850;
-    }
-
-    .graphBox {
-      width:100%; height:270px; position:relative; border-radius:18px;
-      background:
-        linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.015)),
-        rgba(0,0,0,.20);
-      border:1px solid rgba(255,255,255,.07); overflow:hidden;
-    }
-    canvas { display:block; width:100%; height:100%; touch-action:none; }
-    .legend { display:flex; justify-content:space-between; gap:12px; margin-top:10px; color:var(--muted); font-size:13px; }
-    .dot { width:9px; height:9px; display:inline-block; border-radius:50%; margin-right:6px; }
-    .rx { background:var(--primary); } .tx { background:var(--good); }
-    .hidden { display:none !important; }
-    .list { display:flex; flex-direction:column; gap:8px; }
-    .client { background:rgba(255,255,255,.045); padding:10px; border-radius:13px; border:1px solid rgba(255,255,255,.06); }
-    .deviceHeader {
-      display:flex;
-      justify-content:space-between;
-      align-items:flex-start;
-      gap:10px;
-      cursor:pointer;
-    }
-    .deviceChevron {
-      width:28px;
-      height:28px;
-      flex:0 0 28px;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      border-radius:50%;
-      background:rgba(255,255,255,.07);
-      border:1px solid rgba(255,255,255,.11);
-      color:var(--muted);
-      font-weight:900;
-      font-size:18px;
-    }
-    .client.open .deviceChevron { color:var(--text); }
-    .deviceActions { display:none; margin-top:10px; }
-    .client.open .deviceActions { display:grid; }
-    .detailGrid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-    .detail { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.06); border-radius:13px; padding:10px; }
-    details.dropdown { margin-bottom:12px; }
-    details.dropdown summary {
-      list-style:none;
-      cursor:pointer;
-      user-select:none;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      font-size:17px;
-      font-weight:850;
-      margin-bottom:0;
-    }
-    details.dropdown summary::-webkit-details-marker { display:none; }
-    details.dropdown summary:after {
-      content:"+";
-      width:28px;
-      height:28px;
-      flex:0 0 28px;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      border-radius:50%;
-      color:var(--text);
-      background:rgba(255,255,255,.07);
-      border:1px solid rgba(255,255,255,.11);
-      font-size:19px;
-      font-weight:800;
-      line-height:1;
-    }
-    details.dropdown[open] summary:after {
-      content:"−";
-      color:var(--muted);
-      background:rgba(255,255,255,.04);
-    }
-    details.dropdown[open] summary { margin-bottom:12px; }
-    .qr { width:150px; height:150px; background:#fff; border-radius:12px; padding:8px; }
-    .footer { color:var(--muted); font-size:12px; text-align:center; margin:15px 0; }
-    .settingsRow { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
-    .notice {
-      background:rgba(79,140,255,.12); border:1px solid color-mix(in srgb, var(--primary) 35%, transparent);
-      color:var(--text); border-radius:16px; padding:12px; margin-bottom:12px;
-    }
-    .profileNote {
-      margin-top:10px; padding:10px; border-radius:14px;
-      background:rgba(255,255,255,.045); border:1px solid rgba(255,255,255,.07);
-      color:var(--muted); font-size:13px; line-height:1.35;
-    }
-    .miniBtn {
-      min-height:34px; padding:8px 10px; font-size:12px; border-radius:11px;
-      margin-top:8px;
-    }
-    .clientTop {
-      display:flex; justify-content:space-between; gap:10px; align-items:flex-start;
-    }
-    .clientName { font-weight:900; color:var(--text); }
-    .clientMeta { color:var(--muted); font-size:12px; line-height:1.35; margin-top:2px; }
-    .orderBox {
-      display:grid; grid-template-columns:1fr; gap:8px;
-      background:rgba(255,255,255,.04); padding:10px; border-radius:14px;
-      border:1px solid rgba(255,255,255,.07);
-    }
-    .row2 { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; }
-    .statusLine { color:var(--muted); font-size:12px; margin-top:8px; line-height:1.35; }
-
-    .modal {
-      position:fixed; inset:0; background:rgba(0,0,0,.72); display:none;
-      align-items:flex-end; justify-content:center; z-index:20; padding:12px;
-    }
-    .modal.show { display:flex; }
-    .sheet {
-      width:100%; max-width:900px; background:linear-gradient(180deg,var(--card2),var(--card));
-      border:1px solid var(--line); border-radius:24px; padding:15px;
-      box-shadow:0 18px 46px rgba(0,0,0,.45);
-    }
-    .sheetTop { display:flex; justify-content:space-between; align-items:center; gap:12px; }
-    @media (max-width:520px) {
-      body { padding:10px; }
-      .rebootRow { grid-template-columns:1fr !important; }
-      h1 { font-size:26px; }
-      .big { font-size:21px; }
-      .value { font-size:16px; }
-      .grid3 { grid-template-columns:1fr 1fr; }
-      .graphBox { height:255px; }
-      .detailGrid { grid-template-columns:1fr; }
-      .settingsRow { grid-template-columns:1fr; }
-    }
-  
-    #profileButtons {
-      display:grid !important;
-      grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
-      gap:10px;
-      align-items:stretch;
-    }
-    #profileButtons button {
-      width:100%;
-      min-height:44px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      text-align:center;
-      white-space:normal;
-    }
-    select, option {
-      background:#111827;
-      color:#f4f7fb;
-    }
-
-  
-    #profileButtons {
-      display:grid !important;
-      grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
-      gap:10px;
-      align-items:stretch;
-    }
-    #profileButtons button {
-      width:100%;
-      min-height:46px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      text-align:center;
-      white-space:normal;
-    }
-    #profileButtons button.activeProfileBtn {
-      outline:2px solid rgba(255,255,255,.72);
-      box-shadow:0 0 0 4px rgba(255,255,255,.08);
-    }
-    select, option {
-      background:#111827 !important;
-      color:#f4f7fb !important;
-    }
-    .profileManager {
-      display:grid;
-      gap:8px;
-      margin-top:8px;
-    }
-    .profileManageCard {
-      display:grid;
-      grid-template-columns:auto 1fr auto auto;
-      gap:10px;
-      align-items:center;
-      padding:10px;
-      border:1px solid rgba(255,255,255,.08);
-      border-radius:14px;
-      background:rgba(255,255,255,.04);
-    }
-    .profileColorDot {
-      width:14px;
-      height:14px;
-      border-radius:50%;
-    }
-    .profileManageText {
-      display:flex;
-      flex-direction:column;
-      gap:2px;
-      min-width:0;
-    }
-    .profileManageText span {
-      color:var(--muted);
-      font-size:12px;
-      overflow:hidden;
-      text-overflow:ellipsis;
-      white-space:nowrap;
-    }
-    .profileBadge {
-      font-size:11px;
-      color:var(--muted);
-      border:1px solid rgba(255,255,255,.12);
-      border-radius:999px;
-      padding:4px 8px;
-    }
-    .activeBadge {
-      color:var(--good);
-      border-color:rgba(53,208,127,.35);
-    }
-    .dangerBtn {
-      border-color:rgba(255,92,122,.35) !important;
-    }
-
-  
-    #profileButtons {
-      display:grid !important;
-      grid-template-columns:repeat(auto-fit,minmax(132px,1fr));
-      gap:10px;
-      align-items:stretch;
-    }
-    #profileButtons button {
-      width:100%;
-      min-height:46px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      text-align:center;
-      white-space:normal;
-    }
-    #profileButtons button.activeProfileBtn {
-      outline:2px solid rgba(255,255,255,.72);
-      box-shadow:0 0 0 4px rgba(255,255,255,.08);
-    }
-    .profileImportBox {
-      display:grid;
-      gap:12px;
-      padding:12px;
-      border-radius:16px;
-      background:rgba(255,255,255,.04);
-      border:1px solid rgba(255,255,255,.08);
-    }
-    .profileImportGrid {
-      display:grid;
-      grid-template-columns:1fr auto auto;
-      gap:10px;
-      align-items:end;
-    }
-    .profileImportGrid input[type="file"] {
-      max-width:100%;
-    }
-    select, option {
-      background:#111827 !important;
-      color:#f4f7fb !important;
-    }
-    .profileManager {
-      display:grid;
-      gap:8px;
-      margin-top:8px;
-    }
-    .profileManageCard {
-      display:grid;
-      grid-template-columns:auto 1fr auto auto;
-      gap:10px;
-      align-items:center;
-      padding:10px;
-      border:1px solid rgba(255,255,255,.08);
-      border-radius:14px;
-      background:rgba(255,255,255,.04);
-    }
-    .profileColorDot {
-      width:14px;
-      height:14px;
-      border-radius:50%;
-    }
-    .profileManageText {
-      display:flex;
-      flex-direction:column;
-      gap:2px;
-      min-width:0;
-    }
-    .profileManageText span {
-      color:var(--muted);
-      font-size:12px;
-      overflow:hidden;
-      text-overflow:ellipsis;
-      white-space:nowrap;
-    }
-    .profileBadge {
-      font-size:11px;
-      color:var(--muted);
-      border:1px solid rgba(255,255,255,.12);
-      border-radius:999px;
-      padding:4px 8px;
-    }
-    .activeBadge {
-      color:var(--good);
-      border-color:rgba(53,208,127,.35);
-    }
-    .dangerBtn {
-      border-color:rgba(255,92,122,.35) !important;
-    }
-    @media(max-width:700px){
-      .profileImportGrid {
-        grid-template-columns:1fr;
-      }
-      .profileManageCard {
-        grid-template-columns:auto 1fr auto;
-      }
-      .profileManageCard .dangerBtn {
-        grid-column:1 / -1;
-      }
-    }
-
-  
-    .profileManagerCompact {
-      display:grid;
-      grid-template-columns:1fr auto;
-      gap:10px;
-      align-items:end;
-      padding:12px;
-      border-radius:16px;
-      background:rgba(255,255,255,.04);
-      border:1px solid rgba(255,255,255,.08);
-    }
-    .profileManagerCompact select {
-      width:100%;
-    }
-    @media(max-width:700px){
-      .profileManagerCompact {
-        grid-template-columns:1fr;
-      }
-    }
-
-  </style>
-</head>
-<body>
-<div class="app">
-  <div class="top">
-    <div><h1>ProtonPi</h1><div class="sub">VPN router dashboard</div></div>
-    <div id="statePill" class="pill">Checking</div>
-  </div>
-
-  <div id="loginWarning" class="warning hidden">You are not signed in. Status is visible, but controls are disabled. <a href="/login" style="color:white;font-weight:900;">Login</a></div>
-
-  <div id="vpnWarning" class="warning hidden">VPN is down while hotspot may still be active. The kill switch should block client traffic.</div>
-  <div id="tempWarning" class="badwarn hidden">Pi temperature is high.</div>
-  <div id="p2pWarning" class="warning hidden">P2P port may be stale. Renew the port.</div>
-  <div id="ethWarning" class="badwarn hidden">Ethernet is not the active internet route. Check eth0.</div>
-
-  <div class="card hero">
-    <div class="label">Current IP</div>
-    <div id="currentIp" class="big">—</div>
-    <div id="serverText" class="small">—</div>
-  </div>
-
-  <div class="card">
-    <h2>VPN control</h2>
-    <div id="profileButtons" class="profiles"></div>
-    <div id="profileNote" class="profileNote">—</div>
-  </div>
-
-  <div class="card">
-    <div class="grid">
-      <div class="stat clickable" onclick="openProfileDetails()"><div class="label">Profile</div><div id="profile" class="value">—</div></div>
-      <div class="stat"><div class="label">VPN</div><div id="vpn" class="value">—</div></div>
-      <div class="stat"><div class="label">Profile uptime</div><div id="profileUptime" class="value">—</div></div>
-      <div class="stat p2pOnly hidden"><div class="label">P2P port</div><div id="p2pPort" class="value">—</div></div>
-      <div class="stat p2pOnly hidden"><div class="label">Port age</div><div id="portAge" class="value">—</div></div>
-      <div class="stat"><div class="label">Live down</div><div id="downSpeed" class="value">—</div></div>
-      <div class="stat"><div class="label">Live up</div><div id="upSpeed" class="value">—</div></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>Traffic totals</h2>
-    <div class="grid">
-      <div class="stat"><div class="label">Current VPN downloaded</div><div id="vpnDownTotal" class="value">—</div></div>
-      <div class="stat"><div class="label">Current VPN uploaded</div><div id="vpnUpTotal" class="value">—</div></div>
-      <div class="stat"><div class="label">Since boot downloaded</div><div id="bootDownTotal" class="value">—</div></div>
-      <div class="stat"><div class="label">Since boot uploaded</div><div id="bootUpTotal" class="value">—</div></div>
-      <div class="stat"><div class="label">Monthly downloaded</div><div id="monthDownTotal" class="value">—</div></div>
-      <div class="stat"><div class="label">Monthly uploaded</div><div id="monthUpTotal" class="value">—</div></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>Live traffic</h2>
-    <div class="graphBox"><canvas id="trafficGraph" width="900" height="340"></canvas></div>
-    <div class="legend">
-      <span><i class="dot rx"></i>Download</span>
-      <span><i class="dot tx"></i>Upload</span>
-      <span>Tap/drag</span>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>Machine</h2>
-    <div class="grid3">
-      <div class="stat clickable" onclick="openMetric('cpu')"><div class="label">CPU</div><div id="cpu" class="value">—</div></div>
-      <div class="stat clickable" onclick="openMetric('temp')"><div class="label">Temp</div><div id="temp" class="value">—</div></div>
-      <div class="stat clickable" onclick="openMetric('mem')"><div class="label">Memory</div><div id="mem" class="value">—</div></div>
-      <div class="stat"><div class="label">Disk</div><div id="disk" class="value">—</div></div>
-      <div class="stat"><div class="label">Uptime</div><div id="uptime" class="value">—</div></div>
-      <div class="stat clickable" onclick="openMetric('clients')"><div class="label">Clients</div><div id="clients" class="value">—</div></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>Network health</h2>
-    <div class="grid">
-      <div class="stat"><div class="label">Internet latency</div><div id="pingInternet" class="value">—</div></div>
-      <div class="stat"><div class="label">Proton gateway</div><div id="pingProton" class="value">—</div></div>
-      <div class="stat"><div class="label">DNS test</div><div id="dnsStatus" class="value">—</div></div>
-      <div class="stat"><div class="label">Client internet</div><div id="pauseStatus" class="value">—</div></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>Tools</h2>
-    <div class="profiles">
-      <button class="ghost" onclick="doAction('restart_hotspot')">Restart Hotspot</button>
-      <button class="ghost" onclick="doAction('renew_p2p')">Renew P2P Port</button>
-      <button class="ghost" onclick="clearGraphs()">Clear Graphs</button>
-      <button class="ghost" onclick="runDnsTest()">DNS Test</button>
-      <button class="ghost" onclick="runSpeed()">Speed Test</button>
-      <button id="pauseBtn" class="ghost" onclick="togglePause()">Pause Internet</button>
-    </div>
-
-    <div id="speedResult" class="small" style="margin-top:10px;">Speed test is manual to keep Pi load low.</div>
-  </div>
-
-  <details class="card dropdown">
-    <summary>Connected devices</summary>
-    <div id="clientList" class="list small">—</div>
-  </details>
-
-  <details class="card dropdown">
-    <summary>Wi-Fi QR code</summary>
-    <div class="small">Scan to join Pi-Proton-VPN.</div><br>
-    <img class="qr" src="/wifi-qr.png">
-  </details>
-
-
-  <details class="card dropdown">
-    <summary>Settings</summary>
-
-    <h2>Access</h2>
-    <div class="settingsRow">
-      <button class="ghost" onclick="changePassword()">Change Password</button>
-      <a class="btn ghost" href="/logout">Logout</a>
-      <a class="btn ghost" href="/protonpi.crt">Download HTTPS Cert</a>
-    </div>
-
-    <br>
-    <h2>Profiles</h2>
-
-    <div class="profileImportBox">
-      <div>
-        <h2 style="margin-bottom:6px;">Import VPN Profile</h2>
-        <div class="small">Upload a Proton WireGuard <code>.conf</code>. The dashboard will create a new VPN button automatically.</div>
-      </div>
-
-      <div class="profileImportGrid">
-        <label class="small">Config file<br><input id="importConfigFile" type="file" accept=".conf,.txt"></label>
-        <label class="small">Button color<br><input id="importConfigColor" type="color" value="#4f8cff" title="Button color"></label>
-        <button class="ghost" onclick="importVpnConfig()">Import Profile</button>
-      </div>
-
-      <div id="importConfigStatus" class="small">No file selected.</div>
-    </div>
-
-    <br>
-    <div class="label">Profile manager</div>
-    <div id="profileManageList" class="small">—</div>
-
-    <br>
-    <div class="label">Startup profile</div>
-    <select id="startupProfile" onchange="setStartupProfile(this.value)">
-      <option value="gaming">Gaming on boot</option>
-      <option value="p2p">P2P on boot</option>
-      <option value="streaming">Streaming on boot</option>
-      <option value="maxsec">Max Security on boot</option>
-      <option value="off">VPN off on boot</option>
-    </select>
-
-    <br><br>
-    <div class="label">Fallback profile if active VPN fails</div>
-    <select id="fallbackProfile" onchange="saveSettings()">
-      <option value="gaming">Fallback to Gaming</option>
-      <option value="p2p">Fallback to P2P</option>
-      <option value="streaming">Fallback to Streaming</option>
-      <option value="maxsec">Fallback to Max Security</option>
-      <option value="off">No fallback</option>
-    </select>
-
-    <br><br>
-    <div class="label">Favorite profile order</div>
-    <div class="orderBox">
-      <div class="row2">
-        <select id="order1" onchange="saveSettings()">
-          <option value="gaming">Gaming</option><option value="p2p">P2P</option>
-          <option value="streaming">Streaming</option><option value="maxsec">Max Security</option><option value="off">Off</option>
-        </select>
-        <span class="small">1st</span>
-      </div>
-      <div class="row2">
-        <select id="order2" onchange="saveSettings()">
-          <option value="gaming">Gaming</option><option value="p2p">P2P</option>
-          <option value="streaming">Streaming</option><option value="maxsec">Max Security</option><option value="off">Off</option>
-        </select>
-        <span class="small">2nd</span>
-      </div>
-      <div class="row2">
-        <select id="order3" onchange="saveSettings()">
-          <option value="gaming">Gaming</option><option value="p2p">P2P</option>
-          <option value="streaming">Streaming</option><option value="maxsec">Max Security</option><option value="off">Off</option>
-        </select>
-        <span class="small">3rd</span>
-      </div>
-      <div class="row2">
-        <select id="order4" onchange="saveSettings()">
-          <option value="gaming">Gaming</option><option value="p2p">P2P</option>
-          <option value="streaming">Streaming</option><option value="maxsec">Max Security</option><option value="off">Off</option>
-        </select>
-        <span class="small">4th</span>
-      </div>
-    </div>
-
-    <br>
-    <h2>Scheduled reboot</h2>
-    <div class="settingsRow rebootRow">
-      <select id="rebootDay" onchange="saveSettings()">
-        <option value="off">Off</option>
-        <option value="daily">Every day</option>
-        <option value="sun">Sunday</option>
-        <option value="mon">Monday</option>
-        <option value="tue">Tuesday</option>
-        <option value="wed">Wednesday</option>
-        <option value="thu">Thursday</option>
-        <option value="fri">Friday</option>
-        <option value="sat">Saturday</option>
-      </select>
-      <input id="rebootTime" type="time" value="04:00" onchange="saveSettings()">
-    </div>
-
-    <br>
-    <h2>Appearance</h2>
-    <div class="label">Theme</div>
-    <select id="theme" onchange="setTheme(this.value)">
-      <option value="blue">Blue</option>
-      <option value="green">Green</option>
-      <option value="purple">Purple</option>
-      <option value="red">Red</option>
-    </select>
-
-    <br><br>
-    <h2>Backup / restore</h2>
-    <div class="settingsRow">
-      <a class="btn ghost" href="/settings.json">Export Settings</a>
-      <button class="ghost" onclick="importSettingsPrompt()">Import Settings</button>
-      <button class="ghost" onclick="createFullBackup()">Create Full Backup</button>
-      <a class="btn ghost" href="/backup.tar.gz">Download New Backup</a>
-    </div>
-
-    <br>
-    <div class="label">Restore full backup</div>
-    <div class="settingsRow">
-      <select id="backupSelect" onclick="loadBackups()">
-        <option value="">Load backup list...</option>
-      </select>
-      <button class="danger" onclick="restoreSelectedBackup()">Restore Selected Backup</button>
-    </div>
-    <div class="small" style="margin-top:8px;">Restores VPN profiles, dashboard, services, firewall rules, and settings from the selected backup file.</div>
-
-    <br>
-    <h2>Maintenance</h2>
-    <div class="settingsRow">
-      <a class="btn ghost" href="/diagnostics.txt">Diagnostics</a>
-      <button class="danger" onclick="doAction('safe_mode')">Safe Mode</button>
-      <button class="danger" onclick="doAction('reboot')">Reboot Pi</button>
-    </div>
-
-    <div class="small" style="margin-top:10px;">Administrative settings and maintenance tools.</div>
-  </details>
-
-
-  <div class="footer">Refreshes every 3 seconds</div>
-</div>
-
-
-<div id="profileModal" class="modal" onclick="closeProfileDetails(event)">
-  <div class="sheet" onclick="event.stopPropagation()">
-    <div class="sheetTop">
-      <div>
-        <h2>Server profile details</h2>
-        <div class="small">Current WireGuard profile configuration</div>
-      </div>
-      <button class="ghost" onclick="hideProfileDetails()">Close</button>
-    </div>
-    <br>
-    <div id="profileDetails" class="detailGrid">—</div>
-  </div>
-</div>
-
-<div id="modal" class="modal" onclick="closeMetric(event)">
-  <div class="sheet" onclick="event.stopPropagation()">
-    <div class="sheetTop">
-      <div>
-        <h2 id="modalTitle">Metric</h2>
-        <div id="modalSub" class="small">Last samples</div>
-      </div>
-      <button class="ghost" onclick="hideMetric()">Close</button>
-    </div>
-    <br>
-    <div class="graphBox"><canvas id="metricGraph" width="900" height="340"></canvas></div>
-  </div>
-</div>
-
-<script>
-let samples = [];
-let last = null;
-let hoverIndex = null;
-let activeMetric = null;
-
-function $(id){ return document.getElementById(id); }
-function setText(id,v){ $(id).innerText = (v === null || v === undefined || v === "") ? "—" : v; }
-function fmtBytes(n){
-  n = Number(n || 0); const u=["B","KB","MB","GB","TB"]; let i=0;
-  while(n>=1024 && i<u.length-1){ n/=1024; i++; }
-  return n.toFixed(i?1:0)+" "+u[i];
-}
-function fmtRate(n){ return fmtBytes(n)+"/s"; }
-function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
-
-function setTheme(t){
-  document.documentElement.setAttribute("data-theme", t);
-  localStorage.setItem("theme", t);
-  const sel = $("theme");
-  if(sel) sel.value = t;
-  drawTraffic();
-  drawMetric();
-}
-setTheme(localStorage.getItem("theme") || "blue");
-
-const PROFILE_LABELS = {
-  gaming:"Gaming",
-  p2p:"P2P",
-  streaming:"Streaming",
-  maxsec:"Max Security",
-  off:"Off"
-};
-const PROFILE_CLASSES = {
-  gaming:"gaming",
-  p2p:"p2p",
-  streaming:"streaming",
-  maxsec:"maxsec",
-  off:"off"
-};
-let profileButtonsRenderKey = "";
-let lastProfilesCache = [];
-
-const PROFILE_NOTES = {
-  gaming:"Low-latency profile for gaming and general use. Best when you care about ping.",
-  p2p:"P2P profile with Proton port forwarding. Use the displayed port in your torrent/P2P app.",
-  streaming:"Streaming-focused profile for video services and stable throughput.",
-  maxsec:"Secure/privacy-focused profile. Higher latency is expected.",
-  off:"VPN is off. Hotspot traffic should be blocked by the kill switch."
-};
-
-function profileOrderFromSettings(settings){
-  const fallback = ["gaming","p2p","streaming","maxsec","off"];
-  const raw = settings && settings.profile_order ? settings.profile_order : fallback;
-  const clean = [];
-  raw.forEach(x => { if(fallback.includes(x) && !clean.includes(x)) clean.push(x); });
-  fallback.forEach(x => { if(!clean.includes(x)) clean.push(x); });
-  return clean;
-}
-
-function renderProfileButtons(order){
-  // Do not blank the VPN buttons every refresh. That caused the jumping/disappearing.
-  if(!$("profileButtons").children.length){
-    $("profileButtons").innerHTML = (order || ["gaming","p2p","streaming","maxsec","off"]).map(p => {
-      const label = PROFILE_LABELS[p] || p;
-      const cls = PROFILE_CLASSES[p] || "dynamicProfileBtn";
-      return `<button class="${cls}" onclick="setProfile('${p}')">${label}</button>`;
-    }).join("");
-  }
-  refreshVpnProfileButtons(order || []);
-}
-
-async function setProfile(profile){
-  setText("vpn","Switching...");
-
-  const r = await fetch("/api/profile", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({profile})
-  });
-
-  const j = await r.json();
-
-  if(!j.ok){
-    alert(j.error || "Failed");
-    load();
-    return;
-  }
-
-  samples=[];
-  last=null;
-  setTimeout(()=>{ refreshVpnProfileButtons([], true); load(); }, 1800);
-}
-
-async function setStartupProfile(profile){
-  const r = await fetch("/api/default-profile",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({profile})});
-  const j = await r.json();
-  if(!j.ok) alert(j.error || "Failed to set startup profile");
-}
-
-async function saveSettings(){
-  const body = {
-    fallback_profile: $("fallbackProfile").value,
-    reboot_day: $("rebootDay").value,
-    reboot_time: $("rebootTime").value,
-    profile_order: [$("order1").value, $("order2").value, $("order3").value, $("order4").value, "off"]
-  };
-  const r = await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-  const j = await r.json();
-  if(!j.ok) alert(j.error || "Failed to save settings");
-}
-
-async function doAction(action){
-  if(action==="reboot" && !confirm("Reboot the Raspberry Pi?")) return;
-  const r = await fetch("/api/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action})});
-  const j = await r.json();
-  alert(j.message || j.output || "Done");
-  setTimeout(load,1000);
-}
-
-async function togglePause(){
-  const action = $("pauseStatus").innerText.includes("Paused") ? "resume_internet" : "pause_internet";
-  await doAction(action);
-}
-
-function clearGraphs(){
-  samples=[]; last=null; hoverIndex=null;
-  drawTraffic(); drawMetric();
-}
-
-
-async function runSpeed(){
-  setText("speedResult","Running quick test...");
-  const r = await fetch("/api/speedtest",{method:"POST"});
-  const j = await r.json();
-  setText("speedResult", j.ok ? j.result : (j.error || "Speed test failed"));
-}
-
-async function runDnsTest(){
-  setText("dnsStatus","Testing...");
-  const r = await fetch("/api/dns-test",{method:"POST"});
-  const j = await r.json();
-  setText("dnsStatus", j.ok ? "OK" : "Fail");
-  alert(j.message || JSON.stringify(j));
-}
-
-async function changePassword(){
-  const oldPassword = prompt("Current dashboard password:");
-  if(!oldPassword) return;
-  const newPassword = prompt("New dashboard password, minimum 8 characters:");
-  if(!newPassword) return;
-  if(newPassword.length < 8){
-    alert("Password must be at least 8 characters.");
-    return;
-  }
-
-  const r = await fetch("/api/change-password", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({old_password: oldPassword, new_password: newPassword})
-  });
-  const j = await r.json();
-  alert(j.ok ? "Password changed" : (j.error || "Failed"));
-}
-
-function fmtBackupTime(ts){
-  try { return new Date(ts * 1000).toLocaleString(); }
-  catch(e) { return ""; }
-}
-function fmtFileSize(n){
-  n = Number(n || 0);
-  const u = ["B","KB","MB","GB"];
-  let i = 0;
-  while(n >= 1024 && i < u.length - 1){ n /= 1024; i++; }
-  return n.toFixed(i ? 1 : 0) + " " + u[i];
-}
-
-async function loadBackups(){
-  const sel = $("backupSelect");
-  if(!sel) return;
-  const r = await fetch("/api/backups?ts=" + Date.now());
-  const j = await r.json();
-  if(!j.ok){
-    sel.innerHTML = `<option value="">Could not load backups</option>`;
-    return;
-  }
-  if(!j.backups.length){
-    sel.innerHTML = `<option value="">No backups found</option>`;
-    return;
-  }
-  sel.innerHTML = j.backups.map(b =>
-    `<option value="${b.name}">${b.name} · ${fmtFileSize(b.size)} · ${fmtBackupTime(b.mtime)}</option>`
-  ).join("");
-}
-
-async function createFullBackup(){
-  const r = await fetch("/api/create-backup", {method:"POST"});
-  const j = await r.json();
-  alert(j.ok ? ("Created backup: " + j.name) : (j.error || "Backup failed"));
-  loadBackups();
-}
-
-async function restoreSelectedBackup(){
-  const sel = $("backupSelect");
-  const name = sel ? sel.value : "";
-  if(!name){
-    alert("Select a backup first.");
-    return;
-  }
-  if(!confirm("Restore this full backup? This will overwrite current dashboard/profile/settings files.\\n\\n" + name)){
-    return;
-  }
-  const r = await fetch("/api/restore-backup", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({name})
-  });
-  const j = await r.json();
-  alert(j.ok ? "Backup restored. Refresh the dashboard." : (j.error || "Restore failed"));
-  setTimeout(()=>location.reload(), 1500);
-}
-
-
-
-
-function htmlEscape(x){
-  return String(x ?? "").replace(/[&<>"']/g, ch => ({
-    "&":"&amp;",
-    "<":"&lt;",
-    ">":"&gt;",
-    '"':"&quot;",
-    "'":"&#39;"
-  }[ch]));
-}
-
-function safeColor(c){
-  return /^#[0-9a-fA-F]{6}$/.test(String(c || "")) ? c : "#4f8cff";
-}
-
-
-function htmlEscape(x){
-  return String(x ?? "").replace(/[&<>"']/g, ch => ({
-    "&":"&amp;",
-    "<":"&lt;",
-    ">":"&gt;",
-    '"':"&quot;",
-    "'":"&#39;"
-  }[ch]));
-}
-
-function safeColor(c){
-  return /^#[0-9a-fA-F]{6}$/.test(String(c || "")) ? c : "#4f8cff";
-}
-
-async function refreshVpnProfileButtons(preferredOrder=[], force=false){
-  try{
-    const r = await fetch("/api/profiles?ts=" + Date.now());
-    const j = await r.json();
-    if(!j.ok) return;
-
-    const orderIndex = new Map((preferredOrder || []).map((x,i)=>[x,i]));
-    let profiles = j.profiles.slice();
-
-    if(!profiles.some(p => p.name === "off")){
-      profiles.push({name:"off", label:"Off", core:true, color:"#6b7280", active:false});
-    }
-
-    profiles.sort((a,b)=>{
-      const ai = orderIndex.has(a.name) ? orderIndex.get(a.name) : 999;
-      const bi = orderIndex.has(b.name) ? orderIndex.get(b.name) : 999;
-      if(ai !== bi) return ai - bi;
-      if(a.name === "off") return 1;
-      if(b.name === "off") return -1;
-      if(a.core !== b.core) return a.core ? -1 : 1;
-      return String(a.label || a.name).localeCompare(String(b.label || b.name));
-    });
-
-    lastProfilesCache = profiles;
-
-    const renderKey = JSON.stringify(profiles.map(p => ({
-      name:p.name,
-      label:p.label,
-      color:p.color,
-      active:p.active
-    })));
-
-    if(force || renderKey !== profileButtonsRenderKey){
-      profileButtonsRenderKey = renderKey;
-
-      const box = $("profileButtons");
-      box.innerHTML = "";
-
-      for(const p of profiles){
-        const btn = document.createElement("button");
-        btn.textContent = p.label || p.name;
-        btn.dataset.profile = p.name;
-
-        if(PROFILE_CLASSES[p.name]){
-          btn.className = PROFILE_CLASSES[p.name] || "";
-        } else {
-          btn.className = "dynamicProfileBtn";
-          btn.style.background = safeColor(p.color);
-          btn.style.borderColor = safeColor(p.color);
-          btn.style.color = "#fff";
-        }
-
-        if(p.active){
-          btn.classList.add("activeProfileBtn");
-        }
-
-        btn.onclick = () => setProfile(p.name);
-        box.appendChild(btn);
-      }
-    }
-
-    renderProfileManager(profiles.filter(p => p.name !== "off"));
-  } catch(e){}
-}
-
-function renderProfileManager(profiles){
-  const box = $("profileManageList");
-  if(!box) return;
-
-  const deletable = profiles.filter(p => p.name !== "off");
-
-  if(!deletable.length){
-    box.innerHTML = "No profiles found.";
-    return;
-  }
-
-  box.innerHTML = `
-    <div class="profileManagerCompact">
-      <select id="deleteProfileSelect">
-        ${deletable.map(p => `<option value="${htmlEscape(p.name)}">${htmlEscape(p.label || p.name)} (${htmlEscape(p.name)}.conf)${p.active ? " — active" : ""}</option>`).join("")}
-      </select>
-      <button class="ghost dangerBtn" onclick="deleteSelectedProfile()">Delete Selected Profile</button>
-    </div>
-    <div class="small" style="margin-top:8px;">Deleting moves the config to <code>deleted-profiles</code>. If the selected profile is active, VPN will be turned off first.</div>
-  `;
-}
-
-async function deleteSelectedProfile(){
-  const sel = $("deleteProfileSelect");
-  if(!sel || !sel.value){
-    alert("Select a profile first.");
-    return;
-  }
-  await deleteProfile(sel.value);
-}
-
-async function importVpnConfig(){
-  const fileInput = $("importConfigFile");
-  const colorInput = $("importConfigColor");
-  const status = $("importConfigStatus");
-
-  if(!fileInput.files || !fileInput.files[0]){
-    alert("Choose a WireGuard .conf file first.");
-    return;
-  }
-
-  const fd = new FormData();
-  fd.append("config", fileInput.files[0]);
-  fd.append("color", colorInput ? colorInput.value : "#4f8cff");
-
-  status.innerText = "Importing...";
-
-  try{
-    const r = await fetch("/api/import-config", {
-      method:"POST",
-      body:fd
-    });
-
-    const j = await r.json();
-
-    if(j.ok){
-      status.innerText = j.message;
-      alert(j.message + "\n\nA new VPN button has been added.");
-      fileInput.value = "";
-      await refreshVpnProfileButtons();
-    } else {
-      status.innerText = j.error || "Import failed.";
-      alert(j.error || "Import failed.");
-    }
-  } catch(e){
-    status.innerText = "Import failed.";
-    alert("Import failed: " + e);
-  }
-}
-
-async function deleteProfile(profile){
-  if(!confirm("Delete profile '" + profile + "'?\n\nThe config will be moved to deleted-profiles as a backup.")){
-    return;
-  }
-
-  const r = await fetch("/api/delete-profile", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({profile})
-  });
-
-  const j = await r.json();
-  alert(j.ok ? j.message : (j.error || "Delete failed"));
-  await refreshVpnProfileButtons();
-}
-
-async function importSettingsPrompt(){
-  const raw = prompt("Paste exported settings JSON:");
-  if(!raw) return;
-  try {
-    const parsed = JSON.parse(raw);
-    const r = await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(parsed)});
-    const j = await r.json();
-    if(!j.ok) alert(j.error || "Import failed");
-    else { alert("Settings imported"); load(); }
-  } catch(e) { alert("Invalid JSON"); }
-}
-
-
-async function checkAuth(){
-  try {
-    const r = await fetch("/api/auth-status?ts="+Date.now());
-    const a = await r.json();
-    const authed = !!a.authenticated;
-    $("loginWarning").classList.toggle("hidden", authed);
-    document.querySelectorAll("button, select, input").forEach(el => {
-      if(el.closest("#modal") || el.id === "theme") return;
-      if(el.closest(".profiles") || el.closest(".settingsRow") || el.id.includes("Profile") || el.id.includes("reboot") || el.id.includes("order") || el.id === "fallbackProfile") {
-        el.disabled = !authed;
-        el.style.opacity = authed ? "1" : ".55";
-      }
-    });
-    return authed;
-  } catch(e) {
-    return false;
-  }
-}
-
-async function load(){
-  checkAuth();
-  if($("backupSelect")) loadBackups();
-  let s;
-  try {
-    const r = await fetch("/api/status?ts="+Date.now());
-    s = await r.json();
-  } catch(e) {
-    setText("vpn","API offline");
-    return;
-  }
-
-  setText("currentIp", s.current_ip);
-  setText("serverText", s.server || s.route);
-  setText("profile", s.profile_label || s.profile);
-  setText("vpn", s.vpn_up ? "Connected" : "Disconnected");
-  if(s.default_profile) $("startupProfile").value = s.default_profile;
-  if(s.settings){
-    $("fallbackProfile").value = s.settings.fallback_profile || "gaming";
-    $("rebootDay").value = s.settings.reboot_day || "off";
-    $("rebootTime").value = s.settings.reboot_time || "04:00";
-    const order = profileOrderFromSettings(s.settings);
-    ["order1","order2","order3","order4"].forEach((id,i)=>{ if($(id)) $(id).value = order[i]; });
-    renderProfileButtons(order);
-  } else {
-    renderProfileButtons(["gaming","p2p","streaming","maxsec","off"]);
-  }
-
-  const pill=$("statePill");
-  pill.innerText = s.vpn_up ? "Protected" : "Offline";
-  pill.style.color = s.vpn_up ? "var(--good)" : "var(--bad)";
-
-  $("vpnWarning").classList.toggle("hidden", s.vpn_up || s.profile === "off");
-  $("tempWarning").classList.toggle("hidden", !(s.machine.cpu_temp_c && s.machine.cpu_temp_c >= 75));
-  $("tempWarning").innerText = s.machine.cpu_temp_c ? `Pi temperature is high: ${s.machine.cpu_temp_c.toFixed(1)}°C` : "Pi temperature is high.";
-  $("p2pWarning").classList.toggle("hidden", !s.port_age_warning);
-  $("ethWarning").classList.toggle("hidden", !s.eth_warning);
-  if(s.eth_warning) $("ethWarning").innerText = s.eth_warning;
-  setText("profileUptime", s.profile_uptime);
-
-  const activeProfileInfo = lastProfilesCache.find(p => p.name === s.profile);
-  const activeLabel = activeProfileInfo ? (activeProfileInfo.label || activeProfileInfo.name) : s.profile;
-  setText("profileNote", PROFILE_NOTES[s.profile] || ("Active custom profile: " + activeLabel));
-
-  const hasPortForwarding = !!s.port_forwarding_supported;
-  document.querySelectorAll(".p2pOnly").forEach(x=>x.classList.toggle("hidden",!hasPortForwarding));
-  setText("p2pPort", hasPortForwarding ? (s.tcp_port || s.udp_port || "Waiting…") : "—");
-  setText("portAge", hasPortForwarding ? (s.port_age_warning ? ((s.port_age || "—") + " ⚠") : (s.port_age || "—")) : "—");
-
-  setText("pingInternet", s.latency.internet_ms === null ? "—" : s.latency.internet_ms + " ms");
-  setText("pingProton", s.latency.proton_ms === null ? "—" : s.latency.proton_ms + " ms");
-  setText("pauseStatus", s.internet_paused ? "Paused" : "Allowed");
-  $("pauseBtn").innerText = s.internet_paused ? "Resume Internet" : "Pause Internet";
-
-  let down=0, up=0;
-  if(last && s.interfaces && s.interfaces.wg0){
-    const dt=Math.max(s.time-last.time,1);
-    down=Math.max((s.interfaces.wg0.rx-last.interfaces.wg0.rx)/dt,0);
-    up=Math.max((s.interfaces.wg0.tx-last.interfaces.wg0.tx)/dt,0);
-  }
-  last=s;
-
-  setText("downSpeed", fmtRate(down));
-  setText("upSpeed", fmtRate(up));
-  setText("vpnDownTotal", fmtBytes(s.totals.current_vpn.rx));
-  setText("vpnUpTotal", fmtBytes(s.totals.current_vpn.tx));
-  setText("bootDownTotal", fmtBytes(s.totals.since_boot.rx));
-  setText("bootUpTotal", fmtBytes(s.totals.since_boot.tx));
-  setText("monthDownTotal", fmtBytes(s.totals.monthly.rx));
-  setText("monthUpTotal", fmtBytes(s.totals.monthly.tx));
-
-  samples.push({
-    t:new Date().toLocaleTimeString(),
-    down, up,
-    cpu:s.machine.cpu_percent,
-    temp:s.machine.cpu_temp_c,
-    mem:s.machine.mem_used_percent,
-    clients:s.hotspot_clients
-  });
-  if(samples.length>90) samples.shift();
-
-  drawTraffic();
-  drawMetric();
-
-  setText("cpu", s.machine.cpu_percent + "%");
-  setText("temp", s.machine.cpu_temp_c === null ? "—" : s.machine.cpu_temp_c.toFixed(1)+"°C");
-  setText("mem", s.machine.mem_used_percent + "%");
-  setText("disk", s.machine.disk_used_percent + "%");
-  setText("uptime", s.machine.uptime);
-  setText("clients", s.hotspot_clients);
-
-  renderProfileDetails(s.profile_details || {});
-  renderClients(s.clients || []);
-}
-
-function renderProfileDetails(d){
-  const items = [
-    ["Server", d.server],
-    ["Endpoint", d.endpoint],
-    ["NetShield", d.NetShield],
-    ["Moderate NAT", d["Moderate NAT"]],
-    ["Port forwarding", d["NAT-PMP (Port Forwarding)"]],
-    ["VPN Accelerator", d["VPN Accelerator"]],
-    ["Secure Core / Bouncing", d.Bouncing]
-  ].filter(x => x[1] !== undefined && x[1] !== null && x[1] !== "");
-  $("profileDetails").innerHTML = items.length ? items.map(([k,v]) =>
-    `<div class="detail"><div class="label">${k}</div><div class="value">${v}</div></div>`
-  ).join("") : "No profile details available";
-}
-
-function toggleDeviceCard(el){
-  el.classList.toggle("open");
-  const icon = el.querySelector(".deviceChevron");
-  if(icon) icon.innerText = el.classList.contains("open") ? "−" : "+";
-}
-
-const openDeviceCards = new Set();
-
-function deviceKey(c){
-  return c.mac && c.mac !== "unknown" ? c.mac : c.ip;
-}
-
-function toggleDeviceCardById(id, key){
-  const el = document.getElementById(id);
-  if(!el) return;
-
-  const isOpen = el.classList.toggle("open");
-
-  if(isOpen) openDeviceCards.add(key);
-  else openDeviceCards.delete(key);
-
-  const icon = el.querySelector(".deviceChevron");
-  if(icon) icon.innerText = isOpen ? "−" : "+";
-}
-
-function clientScore(c){
-  let score = 0;
-  if((c.ip || "").startsWith("10.42.")) score += 100;
-  if((c.state || "").toUpperCase() === "REACHABLE") score += 50;
-  if(Number(c.rx || 0) > 0 || Number(c.tx || 0) > 0) score += 10;
-  return score;
-}
-
-function dedupeClients(clients){
-  const map = new Map();
-
-  for(const c of clients){
-    const mac = (c.mac || "").toLowerCase();
-    const key = mac && mac !== "unknown" ? mac : c.ip;
-
-    if(!map.has(key) || clientScore(c) > clientScore(map.get(key))){
-      map.set(key, c);
-    }
-  }
-
-  return Array.from(map.values()).sort((a,b)=>{
-    return clientScore(b) - clientScore(a);
-  });
-}
-
-function renderClients(clients){
-  clients = dedupeClients(clients || []);
-
-  if(clients.length){
-    $("clientList").innerHTML = clients.map((c, idx)=>{
-      const name = c.name || ("Device " + c.ip);
-      const policy = c.policy ? `<br>Policy: ${c.policy}` : "";
-      const key = deviceKey(c);
-      const id = "client-" + idx;
-      const opened = openDeviceCards.has(key);
-
-      return `<div class="client ${opened ? "open" : ""}" id="${id}">
-        <div class="deviceHeader" onclick="toggleDeviceCardById('${id}','${key}')">
-          <div>
-            <div class="clientName">${name}</div>
-            <div class="clientMeta">${c.ip} · ${c.mac} · ${c.state}<br>Approx RX/TX: ${fmtBytes(c.rx)} / ${fmtBytes(c.tx)}${policy}</div>
-          </div>
-          <div class="deviceChevron">${opened ? "−" : "+"}</div>
-        </div>
-        <div class="profiles deviceActions">
-          <button class="ghost miniBtn" onclick="event.stopPropagation(); renameClient('${c.mac}','${c.ip}')">Rename</button>
-          <button class="ghost miniBtn" onclick="event.stopPropagation(); deviceControl('block','${c.ip}')">Block</button>
-          <button class="ghost miniBtn" onclick="event.stopPropagation(); deviceControl('unblock','${c.ip}')">Unblock</button>
-          <button class="ghost miniBtn" onclick="event.stopPropagation(); deviceControl('prioritize','${c.ip}')">Prioritize</button>
-          <button class="ghost miniBtn" onclick="event.stopPropagation(); limitDevice('${c.ip}')">Limit</button>
-          <button class="ghost miniBtn" onclick="event.stopPropagation(); deviceControl('clear_limit','${c.ip}')">Clear Policy</button>
-        </div>
-      </div>`;
-    }).join("");
-  } else {
-    $("clientList").innerText = "No clients detected";
-  }
-}
-
-async function renameClient(mac, ip){
-  const name = prompt("Device name:", "");
-  if(!name) return;
-  const r = await fetch("/api/client-name", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({mac, ip, name})
-  });
-  const j = await r.json();
-  if(!j.ok) alert(j.error || "Failed to rename device");
-  load();
-}
-
-async function deviceControl(action, ip){
-  const r = await fetch("/api/device-control", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({action, ip})
-  });
-  const j = await r.json();
-  alert(j.ok ? (j.message || "Done") : (j.error || "Failed"));
-  load();
-}
-
-async function limitDevice(ip){
-  const mbps = prompt("Download limit Mbps for " + ip + " (example: 10). Leave blank to clear:", "");
-  const action = mbps ? "limit" : "clear_limit";
-  const r = await fetch("/api/device-control", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({action, ip, mbps})
-  });
-  const j = await r.json();
-  alert(j.ok ? (j.message || "Done") : (j.error || "Failed"));
-  load();
-}
-
-function drawLineGraph(canvasId, data, series, opts={}){
-  const c=$(canvasId), ctx=c.getContext("2d"), W=c.width, H=c.height;
-  ctx.clearRect(0,0,W,H);
-  const L=64,R=18,T=24,B=42,w=W-L-R,h=H-T-B;
-  ctx.fillStyle="rgba(0,0,0,.14)";
-  ctx.fillRect(0,0,W,H);
-
-  const vals = data.flatMap(p => series.map(s => Number(p[s.key] || 0)));
-  let maxVal;
-  if(opts.maxOverride) maxVal = opts.maxOverride;
-  else if(opts.percent) maxVal = 100;
-  else maxVal = niceMax(Math.max(opts.minMax || 1, ...vals));
-
-  ctx.font="12px Arial";
-  ctx.strokeStyle="rgba(255,255,255,.09)";
-  ctx.fillStyle="rgba(244,247,251,.68)";
-  for(let i=0;i<=4;i++){
-    const y=T+h*i/4;
-    ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(W-R,y); ctx.stroke();
-    const val=maxVal*(1-i/4);
-    ctx.fillText(opts.format ? opts.format(val) : fmtRate(val).replace("/s",""),8,y+4);
-  }
-
-  if(data.length<2) return;
-
-  const x=i=>L+(i/(data.length-1))*w;
-  const y=v=>T+h-(Number(v || 0)/maxVal)*h;
-
-  series.forEach(sr=>{
-    ctx.beginPath();
-    data.forEach((p,i)=>{ if(i===0) ctx.moveTo(x(i),y(p[sr.key])); else ctx.lineTo(x(i),y(p[sr.key])); });
-    ctx.strokeStyle=sr.color;
-    ctx.lineWidth=3;
-    ctx.stroke();
-
-    ctx.lineTo(x(data.length-1), H-B);
-    ctx.lineTo(x(0), H-B);
-    ctx.closePath();
-    const grad=ctx.createLinearGradient(0,T,0,H-B);
-    grad.addColorStop(0, sr.fill || "rgba(255,255,255,.10)");
-    grad.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.fillStyle=grad;
-    ctx.fill();
-  });
-
-  if(hoverIndex !== null && data[hoverIndex]){
-    const xx=x(hoverIndex), p=data[hoverIndex];
-    ctx.strokeStyle="rgba(255,255,255,.40)";
-    ctx.beginPath(); ctx.moveTo(xx,T); ctx.lineTo(xx,H-B); ctx.stroke();
-
-    ctx.fillStyle="rgba(0,0,0,.75)";
-    ctx.fillRect(Math.min(xx+8,W-235),T+8,220,22+series.length*18);
-    ctx.fillStyle="#fff";
-    ctx.fillText(p.t || "",Math.min(xx+18,W-225),T+28);
-    series.forEach((sr,i)=>{
-      const txt = `${sr.label}: ${opts.format ? opts.format(p[sr.key]) : fmtRate(p[sr.key])}`;
-      ctx.fillText(txt,Math.min(xx+18,W-225),T+48+i*18);
-    });
-  }
-
-  ctx.fillStyle="rgba(244,247,251,.72)";
-  ctx.fillText(data[0].t,L,H-12);
-  ctx.fillText(data[data.length-1].t,W-96,H-12);
-}
-
-function niceMax(v){
-  if(v<=1024) return 1024;
-  const p=Math.pow(10,Math.floor(Math.log10(v)));
-  return Math.ceil(v/p)*p;
-}
-
-function drawTraffic(){
-  drawLineGraph("trafficGraph", samples, [
-    {key:"down",label:"Down",color:cssVar("--primary"),fill:"rgba(79,140,255,.18)"},
-    {key:"up",label:"Up",color:cssVar("--good"),fill:"rgba(53,208,127,.14)"}
-  ]);
-}
-
-function openProfileDetails(){
-  $("profileModal").classList.add("show");
-}
-function hideProfileDetails(){
-  $("profileModal").classList.remove("show");
-}
-function closeProfileDetails(e){
-  if(e.target.id==="profileModal") hideProfileDetails();
-}
-
-function openMetric(metric){
-  activeMetric = metric;
-  $("modal").classList.add("show");
-  const titles = {cpu:"CPU usage", temp:"CPU temperature", mem:"Memory usage", clients:"Connected clients"};
-  $("modalTitle").innerText = titles[metric] || "Metric";
-  drawMetric();
-}
-
-function hideMetric(){ $("modal").classList.remove("show"); activeMetric=null; }
-function closeMetric(e){ if(e.target.id==="modal") hideMetric(); }
-
-function drawMetric(){
-  if(!activeMetric) return;
-  const format = activeMetric==="temp" ? (v)=>Number(v||0).toFixed(1)+"°C" :
-                 activeMetric==="clients" ? (v)=>String(Math.round(v||0)) :
-                 (v)=>Number(v||0).toFixed(1)+"%";
-  drawLineGraph("metricGraph", samples, [
-    {key:activeMetric,label:$("modalTitle").innerText,color:cssVar("--primary"),fill:"rgba(79,140,255,.18)"}
-  ], {
-    format,
-    percent: activeMetric==="cpu" || activeMetric==="mem",
-    maxOverride: activeMetric==="temp" ? 100 : null,
-    minMax: activeMetric==="clients" ? 3 : 1
-  });
-}
-
-$("trafficGraph").addEventListener("pointermove", e=>{
-  const rect=$("trafficGraph").getBoundingClientRect();
-  const ratio=(e.clientX-rect.left)/rect.width;
-  hoverIndex=Math.max(0,Math.min(samples.length-1,Math.round(ratio*(samples.length-1))));
-  drawTraffic(); drawMetric();
-});
-$("trafficGraph").addEventListener("pointerleave",()=>{hoverIndex=null;drawTraffic();drawMetric();});
-
-load();
-setInterval(load,3000);
-</script>
-</body>
-</html>
-"""
 
 def run(cmd, timeout=6):
     try:
@@ -1608,10 +83,14 @@ def apply_reboot_cron(settings):
 
 def default_profile():
     val = read("/etc/protonvpn-profiles/default-profile")
-    return val if val in ["gaming","p2p","maxsec","streaming","off"] else "gaming"
+    if val == "off":
+        return "off"
+    if val and profile_exists_for_activation(val):
+        return val
+    return "gaming"
 
 def set_default_profile(profile):
-    if profile not in ["gaming","p2p","maxsec","streaming","off"]:
+    if not profile_exists_for_activation(profile):
         return False
     try:
         with open("/etc/protonvpn-profiles/default-profile","w") as f:
@@ -1649,20 +128,17 @@ def current_ip():
     return cached_value("current_ip", 20, _get)
 
 def cpu_percent():
-    global LAST_CPU
+    # Fixed short sampling window so the reading does not depend on how long
+    # since the last call (which made it spike right after a page reload).
     try:
-        with open("/proc/stat") as f:
-            line=f.readline()
-        parts=line.split()
-        vals=list(map(int,parts[1:]))
-        idle=vals[3]+vals[4]
-        total=sum(vals)
-        if LAST_CPU["total"] is None:
-            LAST_CPU={"total":total,"idle":idle}
-            return 0
-        dt=total-LAST_CPU["total"]
-        di=idle-LAST_CPU["idle"]
-        LAST_CPU={"total":total,"idle":idle}
+        def _snap():
+            with open("/proc/stat") as f:
+                vals=list(map(int,f.readline().split()[1:]))
+            return sum(vals), vals[3]+vals[4]
+        t1,i1=_snap()
+        time.sleep(0.18)
+        t2,i2=_snap()
+        dt=t2-t1; di=i2-i1
         return round(max(0,min(100,(1-di/dt)*100)),1) if dt else 0
     except:
         return 0
@@ -2147,11 +623,669 @@ def api_revoke_trusted_device():
     return jsonify({"ok": True})
 
 
+HTML2 = r"""<!DOCTYPE html>
+<html lang="en" data-theme="blue">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ProtonPi</title>
+<style>
+  :root{
+    --bg0:#05070d; --bg1:#080b14; --card:#0f1626; --card2:#16203a;
+    --text:#eef3fb; --muted:#8a99b3; --line:rgba(255,255,255,.09);
+    --primary:#4f8cff; --primary2:#7aa7ff; --good:#35d07f; --warn:#ffd166; --bad:#ff5b6e;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,"JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Arial,sans-serif;
+  }
+  html[data-theme="green"]{ --primary:#35d07f; --primary2:#7ff0b1; --card:#0c2018; --card2:#11301f; }
+  html[data-theme="purple"]{ --primary:#9b6cff; --primary2:#c6a8ff; --card:#181230; --card2:#241a45; }
+  html[data-theme="red"]{ --primary:#ff5b6e; --primary2:#ff9aa6; --card:#241016; --card2:#341a24; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  @media (prefers-reduced-motion: reduce){ *{ animation:none !important; transition:none !important; } }
+  body{ margin:0; color:var(--text); font-family:var(--sans); line-height:1.45;
+    background:
+      radial-gradient(900px 480px at 12% -8%, color-mix(in srgb,var(--primary) 22%, transparent), transparent 60%),
+      radial-gradient(760px 420px at 100% 0%, color-mix(in srgb,var(--primary2) 16%, transparent), transparent 55%),
+      linear-gradient(180deg,var(--bg1),var(--bg0)); min-height:100vh; }
+  .wrap{ max-width:1080px; margin:0 auto; padding:0 14px 48px; }
+
+  .cmd{ position:sticky; top:0; z-index:30; margin:0 -14px 16px; padding:10px 16px; border-bottom:1px solid var(--line);
+    background: repeating-linear-gradient(180deg, rgba(255,255,255,.018) 0 1px, transparent 1px 3px), color-mix(in srgb,var(--bg0) 78%, transparent);
+    backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
+  .cmdIn{ max-width:1080px; margin:0 auto; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .brand{ display:flex; align-items:baseline; gap:9px; margin-right:auto; }
+  .brand b{ font-size:19px; letter-spacing:-.4px; }
+  .brand span{ font-family:var(--mono); font-size:11px; color:var(--muted); letter-spacing:.5px; text-transform:uppercase; }
+  .state{ display:flex; align-items:center; gap:9px; font-family:var(--mono); font-size:13px; font-weight:600; }
+  .dot{ width:9px; height:9px; border-radius:50%; background:var(--good); box-shadow:0 0 0 0 color-mix(in srgb,var(--good) 70%,transparent); animation:pulse 2.4s infinite; }
+  .dot.off{ background:var(--bad); animation:none; }
+  @keyframes pulse{ 0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--good) 55%,transparent);} 70%{box-shadow:0 0 0 7px transparent;} 100%{box-shadow:0 0 0 0 transparent;} }
+  .chip{ font-family:var(--mono); font-size:12px; font-weight:700; padding:5px 10px; border-radius:999px;
+    background:color-mix(in srgb,var(--primary) 16%,transparent); border:1px solid color-mix(in srgb,var(--primary) 40%,transparent); color:var(--primary2); white-space:nowrap; }
+  .rate{ font-family:var(--mono); font-size:12px; color:var(--muted); white-space:nowrap; }
+  .rate b{ color:var(--text); }
+  .powerWrap{ position:relative; }
+  .powerBtn{ width:38px; height:38px; border-radius:50%; display:grid; place-items:center; cursor:pointer; color:var(--text); background:rgba(255,255,255,.08); border:1px solid var(--line); }
+  .powerBtn:active{ transform:scale(.96); } .powerBtn svg{ width:18px; height:18px; }
+  .menu{ position:absolute; right:0; top:46px; min-width:204px; z-index:40; display:none; background:linear-gradient(180deg,var(--card2),var(--card)); border:1px solid var(--line); border-radius:14px; padding:6px; box-shadow:0 18px 44px rgba(0,0,0,.5); }
+  .menu.show{ display:block; }
+  .menu button{ display:flex; width:100%; align-items:center; text-align:left; font:inherit; font-size:13px; font-weight:700; color:var(--text); background:transparent; border:0; padding:11px 12px; border-radius:9px; cursor:pointer; }
+  .menu button:hover{ background:rgba(255,255,255,.06); } .menu button.danger{ color:#ffb3bc; }
+  .menu .sep{ height:1px; background:var(--line); margin:5px 4px; }
+
+  .banner{ display:none; margin-bottom:14px; padding:11px 14px; border-radius:13px; font-size:13px; font-weight:600;
+    background:color-mix(in srgb,var(--warn) 16%,transparent); border:1px solid color-mix(in srgb,var(--warn) 40%,transparent); color:#ffe6a6; }
+  .banner a{ color:#fff; font-weight:900; }
+
+  .tabs{ display:flex; gap:6px; overflow-x:auto; padding:4px; margin-bottom:16px; background:rgba(255,255,255,.035); border:1px solid var(--line); border-radius:16px; scrollbar-width:none; }
+  .tabs::-webkit-scrollbar{ display:none; }
+  .tab{ flex:1 0 auto; min-width:max-content; text-align:center; font:inherit; font-weight:800; font-size:14px; padding:10px 16px; border-radius:12px; border:0; background:transparent; color:var(--muted); cursor:pointer; white-space:nowrap; }
+  .tab[aria-selected="true"]{ color:var(--text); background:linear-gradient(180deg,color-mix(in srgb,var(--primary) 26%,transparent),color-mix(in srgb,var(--primary) 12%,transparent)); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--primary) 35%,transparent); }
+  .panel{ display:none; animation:fade .25s ease; } .panel.active{ display:block; }
+  @keyframes fade{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;} }
+
+  .grid{ display:grid; gap:13px; grid-template-columns:repeat(2,1fr); }
+  .grid .span2{ grid-column:1 / -1; }
+  @media (max-width:760px){ .grid{ grid-template-columns:1fr; } .grid .span2{ grid-column:auto; } }
+  .card{ background:linear-gradient(180deg,color-mix(in srgb,var(--card2) 80%,transparent),color-mix(in srgb,var(--card) 92%,transparent)); border:1px solid var(--line); border-radius:20px; padding:16px; box-shadow:0 16px 40px rgba(0,0,0,.32); }
+  .card h2{ margin:0 0 13px; font-size:13px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); font-weight:800; }
+  .eyebrow{ font-family:var(--mono); font-size:11px; color:var(--muted); letter-spacing:.08em; text-transform:uppercase; }
+  .big{ font-size:30px; letter-spacing:-1px; margin-top:4px; font-family:var(--mono); font-weight:700; }
+  .heroRow{ display:flex; gap:10px; flex-wrap:wrap; }
+  .heroStat{ flex:1 1 130px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.06); border-radius:14px; padding:12px; }
+  .heroStat .v{ font-family:var(--mono); font-size:18px; font-weight:700; margin-top:5px; word-break:break-word; }
+  .heroStat.clickable{ cursor:pointer; transition:border-color .15s, background .15s; }
+  .heroStat.clickable:hover{ border-color:color-mix(in srgb,var(--primary) 45%,transparent); background:rgba(255,255,255,.06); }
+  .hintp{ font-family:var(--mono); font-size:10px; color:var(--muted); margin-top:4px; opacity:.65; }
+
+  .pbtns{ display:grid; grid-template-columns:repeat(auto-fit,minmax(132px,1fr)); gap:10px; }
+  .pbtn{ font:inherit; font-weight:800; font-size:14px; min-height:50px; border-radius:14px; cursor:pointer; color:#fff; border:1px solid rgba(255,255,255,.14); padding:8px; }
+  .pbtn:active{ transform:scale(.98); }
+  .pbtn.gaming{ background:linear-gradient(135deg,#2f80ff,#5aa2ff); } .pbtn.p2p{ background:linear-gradient(135deg,#13a664,#35d07f); }
+  .pbtn.streaming{ background:linear-gradient(135deg,#00a6ff,#00d4ff); } .pbtn.maxsec{ background:linear-gradient(135deg,#7c4dff,#b085ff); }
+  .pbtn.active{ outline:2px solid rgba(255,255,255,.8); box-shadow:0 0 0 4px rgba(255,255,255,.10); }
+  .note{ margin-top:12px; padding:11px; border-radius:13px; background:rgba(255,255,255,.04); border:1px solid var(--line); color:var(--muted); font-size:13px; }
+
+  .dev{ background:rgba(255,255,255,.04); border:1px solid var(--line); border-radius:14px; padding:12px; margin-bottom:10px; cursor:pointer; }
+  .dev:last-child{ margin-bottom:0; }
+  .devTop{ display:flex; justify-content:space-between; align-items:center; gap:12px; }
+  .devName{ font-weight:800; } .devMeta{ font-family:var(--mono); font-size:12px; color:var(--muted); margin-top:2px; }
+  .chev{ width:26px; height:26px; flex:0 0 26px; display:grid; place-items:center; border-radius:50%; background:rgba(255,255,255,.07); border:1px solid var(--line); color:var(--muted); transition:transform .2s; }
+  .dev.open .chev{ transform:rotate(180deg); color:var(--text); }
+  .devBody{ display:none; margin-top:11px; gap:9px; grid-template-columns:1fr 1fr; }
+  .dev.open .devBody{ display:grid; }
+  .kv{ background:rgba(255,255,255,.035); border:1px solid var(--line); border-radius:11px; padding:9px; }
+  .kv .k{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+  .kv .v{ font-family:var(--mono); font-weight:700; margin-top:3px; }
+
+  label.f{ display:block; font-size:12px; color:var(--muted); margin-bottom:10px; }
+  label.f:last-child{ margin-bottom:0; }
+  input,select{ width:100%; margin-top:6px; font:inherit; font-size:14px; color:var(--text); padding:11px 12px; border-radius:12px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); }
+  input:focus,select:focus,button:focus-visible,.tab:focus-visible{ outline:2px solid var(--primary2); outline-offset:2px; }
+  option{ background:#0f1626; }
+  .btn{ font:inherit; font-weight:800; font-size:14px; padding:12px 14px; border-radius:13px; cursor:pointer; color:#fff; background:linear-gradient(135deg,var(--primary),var(--primary2)); border:0; }
+  .btn.ghost{ background:rgba(255,255,255,.07); border:1px solid var(--line); } .btn.danger{ background:color-mix(in srgb,var(--bad) 16%,transparent); border:1px solid color-mix(in srgb,var(--bad) 40%,transparent); color:#ffd9de; }
+  .btn:active{ transform:scale(.98); } .btn:disabled,.pbtn:disabled,.powerBtn:disabled{ opacity:.5; cursor:not-allowed; }
+  .status{ font-family:var(--mono); font-size:12px; color:var(--muted); margin-top:10px; }
+
+  .qr{ width:140px; height:140px; border-radius:14px; background:#fff; padding:8px; }
+  .swatch{ width:34px; height:34px; border-radius:10px; border:1px solid var(--line); cursor:pointer; }
+  .swatch[aria-pressed="true"]{ outline:2px solid var(--text); outline-offset:2px; }
+  .palette{ display:flex; gap:10px; flex-wrap:wrap; }
+  .filepick{ position:relative; display:flex; align-items:center; gap:12px; margin-top:6px; flex-wrap:wrap; }
+  .filepick input[type="file"]{ position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; margin:0; padding:0; }
+  .filebtn{ display:inline-block; font-weight:800; font-size:13px; padding:11px 16px; border-radius:12px; background:rgba(255,255,255,.08); border:1px solid var(--line); color:var(--text); white-space:nowrap; }
+  .fileName{ font-family:var(--mono); font-size:12px; color:var(--muted); }
+
+  canvas{ width:100%; height:150px; display:block; }
+  .graphWrap{ position:relative; }
+  .gtip{ position:absolute; top:6px; display:none; transform:translateX(-50%); pointer-events:none; background:color-mix(in srgb,var(--bg0) 92%,transparent); border:1px solid var(--line); border-radius:10px; padding:7px 10px; font-family:var(--mono); font-size:11px; line-height:1.5; color:var(--text); white-space:nowrap; box-shadow:0 6px 18px rgba(0,0,0,.4); z-index:5; }
+  .gtip b{ color:var(--primary2); }
+  .legend{ display:flex; gap:16px; margin-top:8px; font-family:var(--mono); font-size:12px; color:var(--muted); }
+  .ldot{ width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:6px; vertical-align:middle; }
+
+  .modal{ position:fixed; inset:0; z-index:50; display:none; align-items:center; justify-content:center; padding:16px; background:rgba(0,0,0,.6); backdrop-filter:blur(4px); }
+  .modal.show{ display:flex; }
+  .sheet{ width:100%; max-width:560px; background:linear-gradient(180deg,var(--card2),var(--card)); border:1px solid var(--line); border-radius:20px; padding:18px; box-shadow:0 24px 60px rgba(0,0,0,.5); }
+  .sheetTop{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; } .sheetTop h3{ margin:0; font-size:16px; }
+  .x{ border:0; background:rgba(255,255,255,.08); color:var(--text); width:34px; height:34px; border-radius:50%; cursor:pointer; font-size:18px; line-height:1; }
+  .mstat{ font-family:var(--mono); font-size:13px; color:var(--muted); margin-top:10px; } .mstat b{ color:var(--text); font-size:20px; }
+  .toast{ position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(10px); opacity:0; pointer-events:none; background:color-mix(in srgb,var(--primary) 24%, var(--card)); border:1px solid color-mix(in srgb,var(--primary) 45%,transparent); color:var(--text); font-weight:700; font-size:13px; padding:10px 16px; border-radius:999px; z-index:60; transition:.2s; }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+  @media (max-width:760px){ .card h2{ text-align:center; } .heroStat{ text-align:center; } .big, .note, .status, .eyebrow{ text-align:center; } .legend, .palette{ justify-content:center; } }
+  @media (max-width:560px){ .modal{ align-items:flex-end; padding:0; } .sheet{ border-radius:20px 20px 0 0; max-width:none; } .cmdIn{ justify-content:center; } .brand{ flex:1 1 100%; justify-content:center; text-align:center; margin-right:0; } .big{ font-size:25px; } }
+</style>
+</head>
+<body>
+<div class="cmd">
+  <div class="cmdIn">
+    <div class="brand"><b>ProtonPi</b><span>router</span></div>
+    <div class="state"><span class="dot" id="dot"></span><span id="stateText">Checking</span></div>
+    <span class="chip" id="profChip">—</span>
+    <span class="rate">&#8595; <b id="rxRate">0.0</b> &#183; &#8593; <b id="txRate">0.0</b> Mb/s</span>
+    <div class="powerWrap">
+      <button class="powerBtn" id="powerBtn" data-control onclick="togglePower(event)" aria-label="Power options" title="Power options">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3v9"/><path d="M6.5 7a8 8 0 1 0 11 0"/></svg>
+      </button>
+      <div class="menu" id="powerMenu" role="menu">
+        <button role="menuitem" onclick="confirmAction('vpnoff')">Turn off VPN</button>
+        <button role="menuitem" onclick="confirmAction('hotspot')">Restart hotspot</button>
+        <div class="sep"></div>
+        <button role="menuitem" class="danger" onclick="confirmAction('reboot')">Reboot computer</button>
+        <button role="menuitem" class="danger" onclick="confirmAction('shutdown')">Shutdown computer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div id="loginBanner" class="banner">Not signed in &#8212; status is visible but controls are disabled. <a href="/login">Login</a></div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" onclick="showTab(this,'overview')">Overview</button>
+    <button class="tab" role="tab" aria-selected="false" onclick="showTab(this,'profiles')">Profiles</button>
+    <button class="tab" role="tab" aria-selected="false" onclick="showTab(this,'devices')">Devices</button>
+    <button class="tab" role="tab" aria-selected="false" onclick="showTab(this,'network')">Network</button>
+  </div>
+
+  <section class="panel active" id="overview">
+    <div class="grid">
+      <div class="card span2">
+        <div class="eyebrow">Tunnel</div>
+        <div class="big" id="heroState">Checking</div>
+        <div class="heroRow" style="margin-top:14px;">
+          <div class="heroStat"><div class="eyebrow">Exit IP</div><div class="v" id="tExitIp">&#8212;</div></div>
+          <div class="heroStat"><div class="eyebrow">Exit node</div><div class="v" id="tNode">&#8212;</div></div>
+          <div class="heroStat"><div class="eyebrow">Handshake</div><div class="v" id="tHandshake">&#8212;</div></div>
+          <div class="heroStat"><div class="eyebrow">Uptime</div><div class="v" id="tUptime">&#8212;</div></div>
+          <div class="heroStat"><div class="eyebrow">Latency</div><div class="v" id="tLatency">&#8212;</div></div>
+          <div class="heroStat"><div class="eyebrow">Packet loss</div><div class="v" id="tLoss">&#8212;</div></div>
+          <div class="heroStat"><div class="eyebrow">DNS</div><div class="v" id="tDns">&#8212;</div></div>
+          <div class="heroStat"><div class="eyebrow">Port forwarding</div><div class="v" id="pfVal" style="color:var(--muted)">&#8212;</div></div>
+        </div>
+      </div>
+
+      <div class="card span2">
+        <h2>Traffic</h2>
+        <div class="heroRow">
+          <div class="heroStat"><div class="eyebrow">Downloaded</div><div class="v" id="totDown">&#8212;</div></div>
+          <div class="heroStat"><div class="eyebrow">Uploaded</div><div class="v" id="totUp">&#8212;</div></div>
+          <div class="heroStat"><div class="eyebrow">Session</div><div class="v" id="totSession">&#8212;</div></div>
+        </div>
+        <div class="graphWrap" style="margin-top:14px"><canvas id="graph"></canvas><div class="gtip" id="gtip"></div></div>
+        <div class="legend"><span><span class="ldot" style="background:var(--primary)"></span>Down</span><span><span class="ldot" style="background:var(--good)"></span>Up</span></div>
+      </div>
+
+      <div class="card span2">
+        <h2>Machine</h2>
+        <div class="heroRow">
+          <div class="heroStat clickable" onclick="openMetric('CPU temp')"><div class="eyebrow">CPU temp</div><div class="v" id="mTemp">&#8212;</div><div class="hintp">tap for graph</div></div>
+          <div class="heroStat clickable" onclick="openMetric('CPU load')"><div class="eyebrow">CPU load</div><div class="v" id="mCpu">&#8212;</div><div class="hintp">tap for graph</div></div>
+          <div class="heroStat clickable" onclick="openMetric('Memory')"><div class="eyebrow">Memory</div><div class="v" id="mMem">&#8212;</div><div class="hintp">tap for graph</div></div>
+          <div class="heroStat"><div class="eyebrow">Storage</div><div class="v" id="mDisk">&#8212;</div></div>
+        </div>
+      </div>
+
+      <div class="card span2">
+        <h2>Speed test</h2>
+        <div class="heroRow">
+          <div class="heroStat"><div class="eyebrow">Download</div><div class="v" id="stDown">&#8212;</div></div>
+          <div class="heroStat"><div class="eyebrow">Result</div><div class="v" id="stResult" style="font-size:13px">&#8212;</div></div>
+        </div>
+        <button class="btn" id="stBtn" data-control style="width:100%;margin-top:12px" onclick="runSpeedTest()">Run speed test</button>
+        <div class="status" id="stStatus">Approx download speed through the active tunnel.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="profiles">
+    <div class="grid">
+      <div class="card span2">
+        <h2>VPN control</h2>
+        <div class="pbtns" id="pbtns"></div>
+        <div class="note" id="pnote">&#8212;</div>
+      </div>
+      <div class="card span2">
+        <h2>Profile details &amp; management</h2>
+        <label class="f">Profile<select id="detSel" onchange="showConf()"></select></label>
+        <div class="heroRow" id="confGrid" style="margin-top:2px"></div>
+        <button class="btn danger" data-control style="width:100%;margin-top:14px" onclick="deleteSelected()">Delete selected profile</button>
+        <div class="status">Public details only &#8212; private and preshared keys are never shown.</div>
+      </div>
+      <div class="card span2">
+        <h2>Import profile</h2>
+        <label class="f">WireGuard .conf
+          <div class="filepick">
+            <input type="file" id="confFile" accept=".conf,.txt" data-control onchange="document.getElementById('fileName').textContent = this.files[0] ? this.files[0].name : 'No file chosen'">
+            <span class="filebtn">Choose .conf file</span>
+            <span class="fileName" id="fileName">No file chosen</span>
+          </div>
+        </label>
+        <div class="eyebrow" style="margin:2px 0 9px">Button color</div>
+        <div class="palette" id="importPalette">
+          <button type="button" class="swatch" data-c="#4f8cff" style="background:#4f8cff"></button>
+          <button type="button" class="swatch" data-c="#35d07f" style="background:#35d07f"></button>
+          <button type="button" class="swatch" data-c="#00d4ff" style="background:#00d4ff"></button>
+          <button type="button" class="swatch" data-c="#9b6cff" style="background:#9b6cff"></button>
+          <button type="button" class="swatch" data-c="#ff7a1a" style="background:#ff7a1a" aria-pressed="true"></button>
+          <button type="button" class="swatch" data-c="#ff5b6e" style="background:#ff5b6e"></button>
+          <button type="button" class="swatch" data-c="#ffd166" style="background:#ffd166"></button>
+        </div>
+        <button class="btn" data-control style="width:100%;margin-top:14px" onclick="importVpnConfig()">Import profile</button>
+        <div class="status" id="importStatus">Validates [Interface] / [Peer], rejects PostUp / PreUp / PostDown / PreDown.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="devices">
+    <div class="card">
+      <h2 id="devTitle">Connected devices</h2>
+      <div id="deviceList"><div class="status">Loading&#8230;</div></div>
+    </div>
+  </section>
+
+  <section class="panel" id="network">
+    <div class="grid">
+      <div class="card span2">
+        <h2>Wi-Fi settings</h2>
+        <div class="grid" style="gap:12px">
+          <label class="f">Network name (SSID)<input id="wifiSsid" data-control></label>
+          <label class="f">Password<input id="wifiPassword" type="text" data-control placeholder="Leave blank to keep current"></label>
+          <label class="f">Security
+            <select id="wifiSecurity" data-control><option value="wpa-psk">WPA2 (recommended)</option><option value="wpa-psk sae">WPA2 / WPA3 mixed</option><option value="sae">WPA3 only</option></select>
+          </label>
+          <label class="f">Band
+            <select id="wifiBand" data-control onchange="populateWifiChannels()"><option value="auto">Auto (best band)</option><option value="a">5 GHz</option><option value="bg">2.4 GHz</option></select>
+          </label>
+          <label class="f">Channel<select id="wifiChannel" data-control></select></label>
+          <div style="display:flex;align-items:end"><button class="btn" data-control style="width:100%" onclick="applyWifi()">Apply Wi-Fi settings</button></div>
+        </div>
+        <div class="status" id="wifiStatus">&#8212;</div>
+        <div class="status" style="opacity:.8">Applying restarts the hotspot and disconnects wireless clients. Manage over Ethernet to avoid losing access. WPA3 and Auto band need driver support and may fail on some adapters.</div>
+        <div style="display:flex;gap:16px;align-items:center;margin-top:16px;flex-wrap:wrap">
+          <img class="qr" id="wifiQr" src="/wifi-qr.png" alt="Wi-Fi QR">
+          <div class="status" style="margin:0">Scan to join the hotspot. The QR reflects the live SSID and key.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Appearance</h2>
+        <div class="eyebrow" style="margin-bottom:9px">Accent</div>
+        <div class="palette">
+          <button class="swatch" data-theme-c="blue" style="background:#4f8cff" onclick="setTheme('blue')"></button>
+          <button class="swatch" data-theme-c="green" style="background:#35d07f" onclick="setTheme('green')"></button>
+          <button class="swatch" data-theme-c="purple" style="background:#9b6cff" onclick="setTheme('purple')"></button>
+          <button class="swatch" data-theme-c="red" style="background:#ff5b6e" onclick="setTheme('red')"></button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Scheduled reboot</h2>
+        <label class="f">Day<select id="rebootDay" data-control onchange="saveReboot()"><option value="off">Off</option><option value="daily">Daily</option><option value="sunday">Sunday</option></select></label>
+        <label class="f">Time<input id="rebootTime" type="time" data-control value="04:00" onchange="saveReboot()"></label>
+      </div>
+
+      <div class="card">
+        <h2>Access</h2>
+        <button class="btn ghost" data-control style="width:100%" onclick="changePassword()">Change dashboard password</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="modal" id="metricModal" onclick="if(event.target===this)closeMetric()">
+  <div class="sheet">
+    <div class="sheetTop"><h3 id="mTitle">Metric</h3><button class="x" onclick="closeMetric()" aria-label="Close">&#215;</button></div>
+    <div class="graphWrap"><canvas id="mGraph" style="height:180px"></canvas><div class="gtip" id="mtip"></div></div>
+    <div class="mstat">Now: <span id="mNow"><b>&#8212;</b></span></div>
+  </div>
+</div>
+
+<div class="modal" id="confirmModal" onclick="if(event.target===this)cancelConfirm()">
+  <div class="sheet" style="max-width:420px">
+    <div class="sheetTop"><h3 id="cfTitle">Are you sure?</h3><button class="x" onclick="cancelConfirm()" aria-label="Close">&#215;</button></div>
+    <div id="cfMsg" style="font-size:14px; color:var(--text); margin-bottom:16px;"></div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+      <button class="btn ghost" onclick="cancelConfirm()">Cancel</button>
+      <button class="btn" id="cfOk" onclick="runConfirm()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+function setText(id,v){ const el=$(id); if(el) el.textContent=(v==null||v==="")?"\u2014":v; }
+function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function fmtBytes(n){ if(n==null) return "\u2014"; n=+n; const u=["B","KB","MB","GB","TB"]; let i=0; while(n>=1024&&i<u.length-1){n/=1024;i++;} return n.toFixed(i?1:0)+" "+u[i]; }
+function mbps(bps){ return bps==null ? "0.0" : (bps*8/1e6).toFixed(1); }
+function agoFmt(sec){ sec=+sec; if(sec<60) return sec+"s ago"; if(sec<3600) return Math.floor(sec/60)+"m ago"; return Math.floor(sec/3600)+"h ago"; }
+
+function showTab(btn,id){
+  document.querySelectorAll('.tab').forEach(t=>t.setAttribute('aria-selected', t===btn));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active', p.id===id));
+  if(id==='network') loadWifi();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+/* theme */
+function setTheme(t){ document.documentElement.setAttribute('data-theme', t); try{ localStorage.setItem('theme', t); }catch(e){}
+  document.querySelectorAll('[data-theme-c]').forEach(s=>s.setAttribute('aria-pressed', s.dataset.themeC===t)); }
+setTheme(localStorage.getItem('theme') || 'blue');
+
+/* auth */
+let authed = false;
+async function checkAuth(){
+  try{ const r=await fetch('/api/auth-status'); const a=await r.json(); authed=!!a.authenticated; }
+  catch(e){ authed=false; }
+  $('loginBanner').style.display = authed ? 'none' : 'block';
+  applyAuthGate();
+  return authed;
+}
+function applyAuthGate(){
+  document.querySelectorAll('[data-control]').forEach(el=>{ el.disabled = !authed; });
+  document.querySelectorAll('#pbtns .pbtn').forEach(b=>{ b.disabled = !authed; });
+}
+
+/* ---- profiles ---- */
+const PROFILE_NOTES = {
+  gaming:"Low-latency routing, split-tunnel friendly.",
+  p2p:"NAT-PMP port forwarding enabled.",
+  streaming:"Region-optimized exit nodes.",
+  maxsec:"Strict kill switch, privacy focused."
+};
+let profilesCache = [];
+let activeProfile = null;
+async function loadProfiles(){
+  try{ const r=await fetch('/api/profiles'); const j=await r.json();
+    const list = Array.isArray(j) ? j : (j && j.profiles ? j.profiles : []);
+    profilesCache = list.filter(p=>p.name!=='off');
+  }catch(e){ profilesCache=[]; }
+  renderProfiles(); populateDetailSelect();
+}
+function renderProfiles(){
+  const wrap=$('pbtns'); wrap.innerHTML='';
+  profilesCache.forEach(p=>{
+    const b=document.createElement('button');
+    b.className='pbtn '+(['gaming','p2p','streaming','maxsec'].includes(p.name)?p.name:'');
+    b.textContent=p.label||p.name;
+    if(p.color && !['gaming','p2p','streaming','maxsec'].includes(p.name)) b.style.background=p.color;
+    if(p.name===activeProfile) b.classList.add('active');
+    b.disabled = !authed;
+    b.onclick=()=>setProfile(p.name);
+    wrap.appendChild(b);
+  });
+}
+async function setProfile(name){
+  try{ const r=await fetch('/api/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profile:name})});
+    const j=await r.json(); if(!j.ok && j.error) toast(j.error);
+  }catch(e){ toast('Switch failed'); }
+  load(); loadProfiles();
+}
+function populateDetailSelect(){
+  const sel=$('detSel'); const cur=sel.value;
+  sel.innerHTML = profilesCache.map(p=>`<option value="${p.name}">${(p.label||p.name)} (${p.name}.conf)</option>`).join('');
+  if(profilesCache.some(p=>p.name===cur)) sel.value=cur;
+  showConf();
+}
+async function showConf(){
+  const name=$('detSel').value; if(!name){ $('confGrid').innerHTML=''; return; }
+  try{ const r=await fetch('/api/profile-conf?name='+encodeURIComponent(name)); const j=await r.json();
+    if(!j.ok){ $('confGrid').innerHTML='<div class="status">'+(j.error||'Unavailable')+'</div>'; return; }
+    $('confGrid').innerHTML = Object.entries(j.fields).map(([k,v])=>{
+      const good=(k==='Port FWD' && String(v).startsWith('On'));
+      return `<div class="heroStat"><div class="eyebrow">${k}</div><div class="v"${good?' style="color:var(--good)"':''}>${v||'\u2014'}</div></div>`;
+    }).join('');
+  }catch(e){ $('confGrid').innerHTML='<div class="status">Unavailable</div>'; }
+}
+async function deleteSelected(){
+  const name=$('detSel').value; if(!name) return;
+  if(!confirm('Delete profile "'+name+'"? Its .conf is moved to deleted-profiles.')) return;
+  try{ const r=await fetch('/api/delete-profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profile:name})});
+    const j=await r.json(); toast(j.ok ? (j.message||'Deleted') : (j.error||'Delete failed'));
+  }catch(e){ toast('Delete failed'); }
+  load(); loadProfiles();
+}
+
+/* import */
+let importColor='#ff7a1a';
+document.querySelectorAll('#importPalette .swatch').forEach(sw=>{
+  sw.addEventListener('click',()=>{ document.querySelectorAll('#importPalette .swatch').forEach(s=>s.setAttribute('aria-pressed','false')); sw.setAttribute('aria-pressed','true'); importColor=sw.dataset.c; });
+});
+async function importVpnConfig(){
+  const f=$('confFile'); if(!f.files[0]){ toast('Choose a .conf file first'); return; }
+  const fd=new FormData(); fd.append('config', f.files[0]); fd.append('color', importColor);
+  setText('importStatus','Importing\u2026');
+  try{ const r=await fetch('/api/import-config',{method:'POST',body:fd}); const j=await r.json();
+    setText('importStatus', j.ok ? (j.message||'Imported') : (j.error||'Import failed'));
+    if(j.ok){ f.value=''; $('fileName').textContent='No file chosen'; loadProfiles(); }
+  }catch(e){ setText('importStatus','Import failed'); }
+}
+
+/* devices */
+function renderDevices(clients){
+  $('devTitle').textContent='Connected devices \u00b7 '+clients.length;
+  const box=$('deviceList');
+  if(!clients.length){ box.innerHTML='<div class="status">No devices connected.</div>'; return; }
+  box.innerHTML = clients.map(c=>`
+    <div class="dev" onclick="this.classList.toggle('open')">
+      <div class="devTop">
+        <div><div class="devName">${(c.name||'Device')}</div><div class="devMeta">${c.ip||''} \u00b7 ${c.mac||''}</div></div>
+        <div class="chev">&#8964;</div>
+      </div>
+      <div class="devBody">
+        <div class="kv"><div class="k">Down</div><div class="v">${fmtBytes(c.rx)}</div></div>
+        <div class="kv"><div class="k">Up</div><div class="v">${fmtBytes(c.tx)}</div></div>
+        <div class="kv"><div class="k">State</div><div class="v">${c.state||'\u2014'}</div></div>
+        <div class="kv"><div class="k">Policy</div><div class="v">${c.policy||'VPN'}</div></div>
+      </div>
+    </div>`).join('');
+}
+
+/* wifi */
+const CH={ a:[36,40,44,48,149,153,157,161,165], bg:[1,6,11] };
+function populateWifiChannels(){
+  const band=$('wifiBand').value, chan=$('wifiChannel'), cur=chan.value;
+  if(band==='auto'){ chan.innerHTML='<option>Auto</option>'; chan.disabled=true; return; }
+  chan.disabled=!authed?true:false;
+  chan.innerHTML='<option>Auto</option>'+CH[band].map(c=>`<option>${c}</option>`).join('');
+  if(Array.from(chan.options).some(o=>o.value===cur)) chan.value=cur;
+}
+let wifiLoaded=false;
+async function loadWifi(){
+  try{ const r=await fetch('/api/wifi?ts='+Date.now()); const j=await r.json();
+    if(!j.ok){ setText('wifiStatus', j.error||'Wi-Fi unavailable'); return; }
+    $('wifiSsid').value=j.ssid||'';
+    $('wifiBand').value=(j.band==='a'||j.band==='bg')?j.band:'auto';
+    populateWifiChannels();
+    const ch=String(j.channel||'0'); if(Array.from($('wifiChannel').options).some(o=>o.value===ch)) $('wifiChannel').value=ch;
+    const valid=['wpa-psk','sae','wpa-psk sae']; $('wifiSecurity').value=valid.includes(j.security)?j.security:'wpa-psk';
+    $('wifiPassword').value=''; $('wifiPassword').placeholder=j.has_password?'Leave blank to keep current':'Set a password (8-63 chars)';
+    $('wifiQr').src='/wifi-qr.png?ts='+Date.now();
+    setText('wifiStatus','Active connection: '+(j.connection||''));
+    wifiLoaded=true;
+  }catch(e){ setText('wifiStatus','Wi-Fi unavailable'); }
+}
+async function applyWifi(){
+  const body={ ssid:$('wifiSsid').value.trim(), band:$('wifiBand').value, channel:$('wifiChannel').value, security:$('wifiSecurity').value };
+  const pw=$('wifiPassword').value; if(pw) body.password=pw;
+  if(!confirm('Apply Wi-Fi changes? This restarts the hotspot and disconnects wireless clients.')) return;
+  setText('wifiStatus','Applying\u2026');
+  try{ const r=await fetch('/api/wifi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); const j=await r.json();
+    setText('wifiStatus', j.ok ? (j.message||'Applied') : (j.error||'Failed'));
+    if(j.ok){ $('wifiPassword').value=''; $('wifiQr').src='/wifi-qr.png?ts='+Date.now(); setTimeout(loadWifi,4000); }
+  }catch(e){ setText('wifiStatus','Failed'); }
+}
+
+/* reboot + password */
+async function saveReboot(){
+  try{ await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reboot_day:$('rebootDay').value, reboot_time:$('rebootTime').value})}); toast('Schedule saved'); }
+  catch(e){ toast('Save failed'); }
+}
+async function changePassword(){
+  const oldp=prompt('Current dashboard password:'); if(oldp===null) return;
+  const newp=prompt('New dashboard password (min 8 characters):'); if(newp===null) return;
+  try{ const r=await fetch('/api/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({old_password:oldp,new_password:newp})});
+    const j=await r.json(); toast(j.ok ? 'Password updated' : (j.error||'Failed'));
+  }catch(e){ toast('Failed'); }
+}
+
+/* power + confirm + toast */
+function togglePower(e){ e.stopPropagation(); $('powerMenu').classList.toggle('show'); }
+document.addEventListener('click',()=>$('powerMenu').classList.remove('show'));
+const ACTIONS={
+  vpnoff:{title:'Turn off VPN?',msg:'All client traffic will leave unprotected until you reconnect.',btn:'Turn off VPN',danger:false},
+  hotspot:{title:'Restart hotspot?',msg:'Wireless clients will disconnect and need to rejoin.',btn:'Restart hotspot',danger:false},
+  reboot:{title:'Reboot computer?',msg:'The router and dashboard go offline for roughly 30-60 seconds.',btn:'Reboot',danger:true},
+  shutdown:{title:'Shutdown computer?',msg:'The router powers off. You will need to power it back on physically.',btn:'Shutdown',danger:true}
+};
+let pendingAction=null;
+function confirmAction(kind){ $('powerMenu').classList.remove('show'); pendingAction=kind; const a=ACTIONS[kind];
+  $('cfTitle').textContent=a.title; $('cfMsg').textContent=a.msg; const ok=$('cfOk'); ok.textContent=a.btn; ok.className='btn'+(a.danger?' danger':''); $('confirmModal').classList.add('show'); }
+function cancelConfirm(){ $('confirmModal').classList.remove('show'); pendingAction=null; }
+async function runConfirm(){ const kind=pendingAction; cancelConfirm(); if(!kind) return;
+  try{ const r=await fetch('/api/power',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:kind})}); const j=await r.json(); toast(j.ok?(j.message||'Done'):(j.error||'Failed')); if(kind==='vpnoff') load(); }
+  catch(e){ toast('Request failed'); } }
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2600); }
+
+/* speed test */
+let stRunning=false;
+async function runSpeedTest(){
+  if(stRunning) return; stRunning=true;
+  $('stBtn').textContent='Testing\u2026'; $('stBtn').disabled=true; setText('stStatus','Running\u2026 this takes a few seconds.'); setText('stDown','\u2026'); setText('stResult','\u2026');
+  try{ const r=await fetch('/api/speedtest',{method:'POST'}); const j=await r.json();
+    setText('stResult', j.ok ? j.result : (j.error||'Failed'));
+    const m=(j.result||'').match(/([\d.]+)\s*Mbps/i); setText('stDown', m ? m[1]+' Mb/s' : '\u2014');
+    setText('stStatus','Last run just now.');
+  }catch(e){ setText('stResult','Failed'); }
+  $('stBtn').textContent='Run speed test'; $('stBtn').disabled=!authed; stRunning=false;
+}
+
+/* ---- live traffic graph ---- */
+let rx=new Array(60).fill(0), tx=new Array(60).fill(0), hoverIndex=null;
+const cv=$('graph'); const gtip=$('gtip');
+function sizeCanvas(){ const r=cv.getBoundingClientRect(); cv.width=r.width*devicePixelRatio; cv.height=150*devicePixelRatio; }
+function pushGraph(downBps,upBps){ rx.push(downBps*8/1e6); rx.shift(); tx.push(upBps*8/1e6); tx.shift(); draw(); }
+function draw(){
+  const ctx=cv.getContext('2d'), w=cv.width, h=cv.height; ctx.clearRect(0,0,w,h);
+  const prim=cssVar('--primary'), good=cssVar('--good');
+  const maxv=Math.max(1, Math.max.apply(null,rx), Math.max.apply(null,tx));
+  const line=(arr,color,fill)=>{ ctx.beginPath(); arr.forEach((v,i)=>{ const x=i/(arr.length-1)*w, y=h-(v/maxv)*h*0.85-6; i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+    ctx.lineWidth=2*devicePixelRatio; ctx.strokeStyle=color; ctx.stroke(); ctx.lineTo(w,h); ctx.lineTo(0,h); ctx.closePath();
+    const g=ctx.createLinearGradient(0,0,0,h); g.addColorStop(0,fill); g.addColorStop(1,'transparent'); ctx.fillStyle=g; ctx.fill(); };
+  line(rx,prim,'rgba(79,140,255,.18)'); line(tx,good,'rgba(53,208,127,.16)');
+  if(hoverIndex!=null){ const gx=hoverIndex/(rx.length-1)*w;
+    ctx.strokeStyle='rgba(255,255,255,.35)'; ctx.lineWidth=1*devicePixelRatio; ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,h); ctx.stroke();
+    const dot=(v,c)=>{ const y=h-(v/maxv)*h*0.85-6; ctx.beginPath(); ctx.arc(gx,y,4*devicePixelRatio,0,7); ctx.fillStyle=c; ctx.fill(); ctx.lineWidth=2*devicePixelRatio; ctx.strokeStyle='rgba(0,0,0,.5)'; ctx.stroke(); };
+    dot(rx[hoverIndex],prim); dot(tx[hoverIndex],good); }
+}
+function gAnnotate(e){ const rect=cv.getBoundingClientRect(), x=e.clientX-rect.left; let i=Math.round(x/rect.width*(rx.length-1)); i=Math.max(0,Math.min(rx.length-1,i));
+  hoverIndex=i; draw(); const ago=(rx.length-1-i)*1;
+  gtip.innerHTML='<b>'+agoFmt(ago)+'</b><br>\u2193 '+rx[i].toFixed(1)+' \u00b7 \u2191 '+tx[i].toFixed(1)+' Mb/s'; gtip.style.display='block';
+  gtip.style.left=Math.min(Math.max(x,34),rect.width-34)+'px'; }
+cv.addEventListener('pointermove',gAnnotate); cv.addEventListener('pointerdown',gAnnotate);
+cv.addEventListener('pointerleave',()=>{ if(window.matchMedia('(hover:hover)').matches){ hoverIndex=null; gtip.style.display='none'; draw(); } });
+
+/* ---- metric modal (history from backend) ---- */
+const METRICS={ 'CPU temp':{api:'temp',unit:'\u00b0C',dp:1,color:'--bad'}, 'CPU load':{api:'cpu',unit:'%',dp:0,color:'--primary'}, 'Memory':{api:'mem',unit:'%',dp:0,color:'--good'}, 'Storage':{api:'disk',unit:'%',dp:0,color:'--warn'} };
+let mHist=[], mMeta=null, mHover=null;
+async function openMetric(name){ mMeta=METRICS[name]; if(!mMeta) return; mHover=null; $('mtip').style.display='none'; $('mTitle').textContent=name; $('metricModal').classList.add('show');
+  try{ const r=await fetch('/api/metric-history?name='+mMeta.api); const j=await r.json(); mHist=(j.ok&&j.samples&&j.samples.length)?j.samples.slice():[0]; }catch(e){ mHist=[0]; }
+  drawMetric(); }
+function closeMetric(){ $('metricModal').classList.remove('show'); }
+function drawMetric(){ const mcv=$('mGraph'); const r=mcv.getBoundingClientRect(); mcv.width=r.width*devicePixelRatio; mcv.height=180*devicePixelRatio;
+  const ctx=mcv.getContext('2d'), w=mcv.width, h=mcv.height; ctx.clearRect(0,0,w,h); const col=cssVar(mMeta.color);
+  const min=Math.min.apply(null,mHist), max=Math.max.apply(null,mHist), span=(max-min)||1;
+  ctx.beginPath(); mHist.forEach((v,i)=>{ const x=mHist.length>1?i/(mHist.length-1)*w:0, y=h-((v-min)/span)*h*0.78-h*0.12; i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+  ctx.lineWidth=2*devicePixelRatio; ctx.strokeStyle=col; ctx.stroke(); ctx.lineTo(w,h); ctx.lineTo(0,h); ctx.closePath();
+  const g=ctx.createLinearGradient(0,0,0,h); g.addColorStop(0,col+'40'); g.addColorStop(1,'transparent'); ctx.fillStyle=g; ctx.fill();
+  if(mHover!=null){ const gx=mHist.length>1?mHover/(mHist.length-1)*w:0; ctx.strokeStyle='rgba(255,255,255,.35)'; ctx.lineWidth=1*devicePixelRatio; ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,h); ctx.stroke();
+    const v=mHist[mHover], y=h-((v-min)/span)*h*0.78-h*0.12; ctx.beginPath(); ctx.arc(gx,y,4*devicePixelRatio,0,7); ctx.fillStyle=col; ctx.fill(); }
+  const cur=mHist[mHist.length-1]; $('mNow').innerHTML='<b>'+(cur==null?'\u2014':cur.toFixed(mMeta.dp))+'</b> '+mMeta.unit; }
+(function(){ const mcv=$('mGraph'), mtip=$('mtip');
+  function mAnnotate(e){ if(!mMeta||!mHist.length) return; const rect=mcv.getBoundingClientRect(), x=e.clientX-rect.left; let i=Math.round(x/rect.width*(mHist.length-1)); i=Math.max(0,Math.min(mHist.length-1,i));
+    mHover=i; drawMetric(); const ago=(mHist.length-1-i)*3; mtip.innerHTML='<b>'+agoFmt(ago)+'</b><br>'+mHist[i].toFixed(mMeta.dp)+' '+mMeta.unit; mtip.style.display='block'; mtip.style.left=Math.min(Math.max(x,34),rect.width-34)+'px'; }
+  mcv.addEventListener('pointermove',mAnnotate); mcv.addEventListener('pointerdown',mAnnotate);
+  mcv.addEventListener('pointerleave',()=>{ if(window.matchMedia('(hover:hover)').matches){ mHover=null; mtip.style.display='none'; drawMetric(); } }); })();
+
+window.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeMetric(); cancelConfirm(); $('powerMenu').classList.remove('show'); } });
+window.addEventListener('resize',()=>{ sizeCanvas(); draw(); });
+
+/* ---- main poll ---- */
+let lastStatus=null;
+async function load(){
+  await checkAuth();
+  let s;
+  try{ const r=await fetch('/api/status'); s=await r.json(); }
+  catch(e){ setText('stateText','API offline'); return; }
+  const up=!!s.vpn_up;
+  $('dot').classList.toggle('off', !up);
+  setText('stateText', up?'Connected':'Disconnected');
+  $('profChip').textContent = up ? (s.profile_label||s.profile) : 'VPN off';
+  $('heroState').textContent = up ? ('Connected \u00b7 '+(s.profile_label||s.profile)) : 'Disconnected';
+  activeProfile = s.profile;
+
+  // throughput + live graph handled by pollRate() every 1s
+
+  setText('tExitIp', up?s.current_ip:'\u2014');
+  setText('tNode', up?(s.server||s.route):'\u2014');
+  setText('tHandshake', s.handshake_age==null?'\u2014':agoFmt(s.handshake_age));
+  setText('tUptime', s.machine?s.machine.uptime:'\u2014');
+  setText('tLatency', (s.latency&&s.latency.internet_ms!=null)?(s.latency.internet_ms+' ms'):'\u2014');
+  setText('tLoss', s.packet_loss==null?'\u2014':(s.packet_loss+'%'));
+  const dns=$('tDns'); if(s.dns_ok==null){ dns.textContent='\u2014'; dns.style.color=''; } else { dns.textContent=s.dns_ok?'OK':'Fail'; dns.style.color=s.dns_ok?'var(--good)':'var(--bad)'; }
+
+  const pf=$('pfVal');
+  if(s.port_forwarding_supported){ const p=s.tcp_port||s.udp_port; pf.textContent = p ? ('TCP '+(s.tcp_port||'\u2014')+' \u00b7 UDP '+(s.udp_port||'\u2014')) : 'Waiting\u2026'; pf.style.color='var(--good)'; }
+  else { pf.textContent='Off'; pf.style.color='var(--muted)'; }
+
+  if(s.totals && s.totals.current_vpn){ setText('totDown', fmtBytes(s.totals.current_vpn.rx)); setText('totUp', fmtBytes(s.totals.current_vpn.tx)); }
+  setText('totSession', s.profile_uptime);
+
+  if(s.machine){
+    setText('mCpu', (s.machine.cpu_percent!=null?s.machine.cpu_percent+'%':'\u2014'));
+    setText('mTemp', s.machine.cpu_temp_c==null?'\u2014':(s.machine.cpu_temp_c.toFixed(1)+' \u00b0C'));
+    setText('mMem', (s.machine.mem_used_percent!=null?s.machine.mem_used_percent+'%':'\u2014'));
+    setText('mDisk', (s.machine.disk_used_percent!=null?s.machine.disk_used_percent+'%':'\u2014'));
+  }
+  renderDevices(s.clients||[]);
+  setText('pnote', PROFILE_NOTES[s.profile] || ('Active profile: '+(s.profile_label||s.profile)));
+
+  if(s.settings){ if($('rebootDay').value!==(s.settings.reboot_day||'off')) $('rebootDay').value=s.settings.reboot_day||'off'; if(document.activeElement!==$('rebootTime')) $('rebootTime').value=s.settings.reboot_time||'04:00'; }
+  lastStatus=s;
+}
+
+/* live throughput + graph poll (fast, lightweight) */
+let lastRate=null;
+async function pollRate(){
+  try{ const r=await fetch('/api/rate'); const j=await r.json();
+    if(j && j.time!=null){
+      if(lastRate){ const dt=Math.max(j.time-lastRate.time,0.001);
+        const down=Math.max((j.rx-lastRate.rx)/dt,0), upr=Math.max((j.tx-lastRate.tx)/dt,0);
+        $('rxRate').textContent=mbps(down); $('txRate').textContent=mbps(upr); pushGraph(down,upr);
+      }
+      lastRate=j;
+    }
+  }catch(e){}
+}
+
+/* init */
+sizeCanvas(); draw();
+loadProfiles();
+load();
+pollRate(); setInterval(pollRate, 1000);
+setInterval(load, 3000);
+</script>
+</body>
+</html>
+"""
+
 @app.route("/")
 def index():
     if not is_authed():
         return redirect("/login")
-    return render_template_string(HTML)
+    return render_template_string(HTML2)
 
 
 
@@ -2162,12 +1296,33 @@ def proton_port_service_active():
     except Exception:
         return False
 
+def known_profile_names():
+    names = []
+    try:
+        for fn in os.listdir(PROFILE_DIR):
+            if fn.endswith(".conf"):
+                n = fn[:-5]
+                if re.match(r"^[A-Za-z0-9._-]+$", n):
+                    names.append(n)
+    except Exception:
+        pass
+    ordered = [x for x in CORE_PROFILES if x in names]
+    ordered += sorted(x for x in names if x not in CORE_PROFILES)
+    return ordered
+
 def active_profile_supports_port_forwarding(profile):
     if not profile or profile == "off":
         return False
 
     if profile == "p2p":
         return True
+
+    try:
+        meta = load_profile_meta()
+        if profile in meta and meta[profile].get("port_forwarding"):
+            return True
+    except Exception:
+        pass
 
     path = os.path.join(PROFILE_DIR, profile + ".conf")
     try:
@@ -2195,10 +1350,12 @@ def status():
     vpn_up="interface: wg0" in wg_raw
     profile=current_profile_name() or read("/run/vpn-profile-current") or "unknown"
     age_sec=port_age_seconds()
-    cl=clients()
+    cl=cached_value("clients", 2.5, clients)
     wg=iface_bytes("wg0")
     temp=cpu_temp()
     settings=load_settings()
+    machine={"cpu_percent":cpu_percent(),"cpu_temp_c":temp,"mem_used_percent":mem_percent(),"disk_used_percent":disk_percent(),"uptime":uptime()}
+    sample_metric_history(temp, machine["cpu_percent"], machine["mem_used_percent"], machine["disk_used_percent"])
 
     return jsonify({
         "time":time.time(),
@@ -2222,12 +1379,15 @@ def status():
         "port_forwarding_supported": active_profile_supports_port_forwarding(profile) and vpn_up,
         "interfaces":{"eth0":iface_bytes("eth0"),"wlan0":iface_bytes("wlan0"),"wg0":wg},
         "totals":traffic_totals(wg),
-        "machine":{"cpu_percent":cpu_percent(),"cpu_temp_c":temp,"mem_used_percent":mem_percent(),"disk_used_percent":disk_percent(),"uptime":uptime()},
+        "machine":machine,
         "hotspot_clients":len(cl),
         "clients":cl,
         "internet_paused":internet_paused(),
         "latency":{"internet_ms":ping_ms("1.1.1.1"),"proton_ms":ping_ms("10.2.0.1") if vpn_up else None},
         "health": health_score(),
+        "handshake_age": handshake_age_seconds() if vpn_up else None,
+        "packet_loss": packet_loss_percent() if vpn_up else None,
+        "dns_ok": dns_ok(),
         "throttling": throttling_status()
     })
 
@@ -2268,7 +1428,7 @@ def api_settings():
         if k in data:
             settings[k]=data[k]
 
-    if settings.get("fallback_profile") not in ["gaming","p2p","streaming","maxsec","off"]:
+    if settings.get("fallback_profile") not in (known_profile_names() + ["off"]):
         return jsonify({"ok":False,"error":"Invalid fallback profile"}),400
 
     if settings.get("reboot_day") not in ["off","daily","sun","mon","tue","wed","thu","fri","sat"]:
@@ -2277,7 +1437,7 @@ def api_settings():
     if not re.match(r"^\d{2}:\d{2}$", settings.get("reboot_time","04:00")):
         return jsonify({"ok":False,"error":"Invalid reboot time"}),400
 
-    allowed_profiles = ["gaming","p2p","streaming","maxsec","off"]
+    allowed_profiles = known_profile_names() + ["off"]
     order = settings.get("profile_order", allowed_profiles)
     if not isinstance(order, list):
         order = allowed_profiles
@@ -2467,10 +1627,6 @@ def backup_pack():
         })
     except Exception as e:
         return Response(f"Backup failed: {e}", status=500)
-
-@app.route("/readonly")
-def readonly():
-    return render_template_string(HTML.replace("VPN control", "Read-only status").replace("Tools", "Read-only tools"))
 
 @app.route("/api/lock", methods=["POST"])
 def api_lock():
@@ -2803,6 +1959,9 @@ def api_delete_profile():
     deleted_path = os.path.join(deleted_dir, f"{profile}.{stamp}.conf")
     shutil.move(path, deleted_path)
 
+    if os.path.exists(path):
+        return jsonify({"ok": False, "error": "Profile file still exists after delete: " + profile}), 500
+
     meta = load_profile_meta()
     if profile in meta:
         del meta[profile]
@@ -2831,6 +1990,257 @@ def api_delete_profile():
         "message": f"Deleted profile: {profile}" + (" and turned VPN off" if was_active else ""),
         "deleted_to": os.path.basename(deleted_path)
     })
+
+def hotspot_connection():
+    """Find the NetworkManager Wi-Fi connection acting as an access point.
+    Detected at runtime so no SSID or connection name is hardcoded."""
+    try:
+        out = subprocess.check_output(
+            ["nmcli", "-t", "-f", "NAME,TYPE", "connection", "show"],
+            text=True, timeout=5)
+    except Exception:
+        return None
+    wireless = []
+    for line in out.splitlines():
+        name, sep, ctype = line.rpartition(":")
+        if ctype == "802-11-wireless" and name:
+            wireless.append(name.replace("\\:", ":"))
+    for name in wireless:
+        if nm_field(name, "802-11-wireless.mode") == "ap":
+            return name
+    return wireless[0] if wireless else None
+
+
+def nm_field(conn, field, secrets=False):
+    if not conn:
+        return ""
+    cmd = ["nmcli"]
+    if secrets:
+        cmd.append("-s")
+    cmd += ["-g", field, "connection", "show", conn]
+    try:
+        return subprocess.check_output(cmd, text=True, timeout=5).strip()
+    except Exception:
+        return ""
+
+
+VALID_5GHZ = [36,40,44,48,52,56,60,64,100,104,108,112,116,120,124,128,
+              132,136,140,144,149,153,157,161,165]
+
+
+@app.route("/api/wifi")
+def api_wifi():
+    auth = require_control_auth()
+    if auth: return auth
+    conn = hotspot_connection()
+    if not conn:
+        return jsonify({"ok": False, "error": "No Wi-Fi access point connection found"}), 404
+    band = nm_field(conn, "802-11-wireless.band")
+    return jsonify({
+        "ok": True,
+        "connection": conn,
+        "ssid": nm_field(conn, "802-11-wireless.ssid"),
+        "band": band if band in ("a", "bg") else "auto",
+        "channel": nm_field(conn, "802-11-wireless.channel") or "0",
+        "security": nm_field(conn, "802-11-wireless-security.key-mgmt"),
+        "has_password": bool(nm_field(conn, "802-11-wireless-security.psk", secrets=True))
+    })
+
+
+@app.route("/api/wifi", methods=["POST"])
+def api_wifi_set():
+    auth = require_control_auth()
+    if auth: return auth
+    if blocked_when_locked():
+        return jsonify({"ok": False, "error": "Dashboard is locked or read-only"}), 403
+    conn = hotspot_connection()
+    if not conn:
+        return jsonify({"ok": False, "error": "No Wi-Fi access point connection found"}), 404
+
+    data = request.get_json(force=True)
+    ssid = str(data.get("ssid", "")).strip()
+    band = str(data.get("band", "")).strip()
+    channel = str(data.get("channel", "")).strip()
+    password = data.get("password", None)
+
+    if not (1 <= len(ssid) <= 32):
+        return jsonify({"ok": False, "error": "SSID must be 1-32 characters"}), 400
+    if band not in ("a", "bg", "auto"):
+        return jsonify({"ok": False, "error": "Band must be 'a' (5GHz), 'bg' (2.4GHz), or 'auto'"}), 400
+
+    if channel in ("", "auto", "0"):
+        chan = ""          # empty clears the channel -> automatic selection
+    elif re.match(r"^\d{1,3}$", channel):
+        ch = int(channel)
+        if band == "bg" and not (1 <= ch <= 14):
+            return jsonify({"ok": False, "error": "2.4GHz channel must be 1-14"}), 400
+        if band == "a" and ch not in VALID_5GHZ:
+            return jsonify({"ok": False, "error": "Invalid 5GHz channel"}), 400
+        chan = str(ch)
+    else:
+        return jsonify({"ok": False, "error": "Invalid channel"}), 400
+
+    sec = str(data.get("security", "")).strip().lower()
+    SEC_MAP = {
+        "wpa-psk":     ["802-11-wireless-security.key-mgmt", "wpa-psk",
+                        "802-11-wireless-security.proto", "rsn",
+                        "802-11-wireless-security.pmf", "1"],
+        "wpa-psk sae": ["802-11-wireless-security.key-mgmt", "wpa-psk sae",
+                        "802-11-wireless-security.proto", "rsn",
+                        "802-11-wireless-security.pmf", "2"],
+        "sae":         ["802-11-wireless-security.key-mgmt", "sae",
+                        "802-11-wireless-security.proto", "rsn",
+                        "802-11-wireless-security.pmf", "3"],
+    }
+
+    if band == "auto":
+        band, chan = "", ""   # clear band/channel so NetworkManager auto-selects
+    mods = ["802-11-wireless.ssid", ssid,
+            "802-11-wireless.band", band,
+            "802-11-wireless.channel", chan]
+
+    if sec:
+        if sec not in SEC_MAP:
+            return jsonify({"ok": False, "error": "Unsupported security type"}), 400
+        mods += SEC_MAP[sec]
+
+    if password is not None and password != "":
+        if not (8 <= len(password) <= 63):
+            return jsonify({"ok": False, "error": "Password must be 8-63 characters"}), 400
+        # NM uses the psk property for both WPA2 (wpa-psk) and WPA3 (sae)
+        mods += ["802-11-wireless-security.psk", password]
+
+    try:
+        r = subprocess.run(["nmcli", "connection", "modify", conn] + mods,
+                           capture_output=True, text=True, timeout=15)
+        if r.returncode != 0:
+            return jsonify({"ok": False, "error": "Failed to apply: " + (r.stderr or r.stdout).strip()}), 500
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+    try:
+        subprocess.run(["nmcli", "connection", "up", conn],
+                       capture_output=True, text=True, timeout=25)
+    except Exception:
+        pass
+
+    return jsonify({"ok": True, "message": "Wi-Fi settings applied. Wireless clients must reconnect."})
+
+
+# ---- redesign stage 1: rolling metric history ----
+METRIC_HISTORY = {"temp": [], "cpu": [], "mem": [], "disk": []}
+METRIC_HISTORY_MAX = 120
+
+def sample_metric_history(temp, cpu, mem, disk):
+    for k, v in (("temp", temp), ("cpu", cpu), ("mem", mem), ("disk", disk)):
+        if v is None:
+            continue
+        try:
+            buf = METRIC_HISTORY[k]
+            buf.append(round(float(v), 1))
+            if len(buf) > METRIC_HISTORY_MAX:
+                del buf[:len(buf) - METRIC_HISTORY_MAX]
+        except Exception:
+            pass
+
+@app.route("/api/metric-history")
+def api_metric_history():
+    auth = require_control_auth()
+    if auth: return auth
+    name = request.args.get("name", "")
+    key = {"temp":"temp","cpu":"cpu","load":"cpu","mem":"mem","memory":"mem",
+           "disk":"disk","storage":"disk"}.get(name)
+    if not key:
+        return jsonify({"ok": False, "error": "Unknown metric"}), 400
+    return jsonify({"ok": True, "name": key, "samples": METRIC_HISTORY[key]})
+
+# ---- redesign stage 1: tunnel health collectors ----
+def handshake_age_seconds():
+    out = run(["wg", "show", "wg0", "latest-handshakes"], 3)
+    best = None
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) >= 2 and parts[-1].isdigit():
+            ts = int(parts[-1])
+            if ts > 0:
+                age = max(0, int(time.time()) - ts)
+                best = age if best is None else min(best, age)
+    return best
+
+def packet_loss_percent(host="1.1.1.1"):
+    def _get():
+        out = run(["ping", "-n", "-c", "3", "-w", "2", host], 5)
+        m = re.search(r"(\d+(?:\.\d+)?)% packet loss", out)
+        return float(m.group(1)) if m else None
+    return cached_value("loss_" + host, 30, _get)
+
+def dns_ok():
+    def _get():
+        return bool(run(["getent", "hosts", "cloudflare.com"], 4).strip())
+    return cached_value("dns_ok", 20, _get)
+
+# ---- redesign stage 1: public conf fields for a profile (never secrets) ----
+@app.route("/api/profile-conf")
+def api_profile_conf():
+    auth = require_control_auth()
+    if auth: return auth
+    name = request.args.get("name", "")
+    if not re.match(r"^[A-Za-z0-9._-]+$", name):
+        return jsonify({"ok": False, "error": "Invalid profile"}), 400
+    path = os.path.join(PROFILE_DIR, name + ".conf")
+    if not os.path.exists(path):
+        return jsonify({"ok": False, "error": "Profile not found"}), 404
+    fields = {"Label": read_profile_display(name), "Endpoint": "", "Address": "",
+              "DNS": "", "AllowedIPs": "", "Port FWD": "Off", "Peer key": ""}
+    try:
+        for line in open(path):
+            s = line.strip(); low = s.lower()
+            if "=" not in s:
+                continue
+            val = s.split("=", 1)[1].strip()
+            if low.startswith("endpoint"):     fields["Endpoint"] = val
+            elif low.startswith("address"):    fields["Address"] = val
+            elif low.startswith("dns"):        fields["DNS"] = val
+            elif low.startswith("allowedips"): fields["AllowedIPs"] = val
+            elif low.startswith("publickey"):  fields["Peer key"] = (val[:10] + "\u2026") if val else ""
+    except Exception:
+        pass
+    if active_profile_supports_port_forwarding(name):
+        fields["Port FWD"] = "On (NAT-PMP)"
+    return jsonify({"ok": True, "name": name, "fields": fields})
+
+# ---- redesign stage 1: power actions ----
+@app.route("/api/power", methods=["POST"])
+def api_power():
+    auth = require_control_auth()
+    if auth: return auth
+    if blocked_when_locked():
+        return jsonify({"ok": False, "error": "Dashboard is locked or read-only"}), 403
+    action = (request.get_json(force=True) or {}).get("action", "")
+    if action == "vpnoff":
+        run(["/usr/local/sbin/vpn-profile", "off"], 50)
+        return jsonify({"ok": True, "message": "VPN turned off"})
+    if action == "hotspot":
+        conn = hotspot_connection()
+        if not conn:
+            return jsonify({"ok": False, "error": "No hotspot connection found"}), 404
+        subprocess.Popen(["nmcli", "connection", "up", conn])
+        return jsonify({"ok": True, "message": "Hotspot restarting"})
+    if action == "reboot":
+        subprocess.Popen(["systemctl", "reboot"])
+        return jsonify({"ok": True, "message": "Rebooting"})
+    if action == "shutdown":
+        subprocess.Popen(["systemctl", "poweroff"])
+        return jsonify({"ok": True, "message": "Shutting down"})
+    return jsonify({"ok": False, "error": "Unknown action"}), 400
+
+@app.route("/api/rate")
+def api_rate():
+    auth = require_control_auth()
+    if auth: return auth
+    wg = iface_bytes("wg0")
+    return jsonify({"time": time.time(), "rx": wg["rx"], "tx": wg["tx"]})
+
 
 @app.route("/api/backups")
 def api_backups():
@@ -2927,8 +2337,8 @@ def protonpi_cert():
 
 @app.route("/wifi-qr.png")
 def wifi_qr():
-    ssid="Pi-VPN-Router"
-    password="Password"
+    ssid = nm_field(hotspot_connection(), "802-11-wireless.ssid") or "ProtonPi"
+    password = nm_field(hotspot_connection(), "802-11-wireless-security.psk", secrets=True) or ""
     wifi=f"WIFI:T:WPA;S:{ssid};P:{password};;"
     png=run(["sh","-c",f"qrencode -t PNG -o - '{wifi}' | base64 -w0"],5)
     return Response(base64.b64decode(png),mimetype="image/png")

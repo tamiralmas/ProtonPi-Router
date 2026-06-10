@@ -84,7 +84,18 @@ echo "IPv4:"
 curl -4 -s --max-time 8 ifconfig.me || true
 echo
 
-if [ "$PROFILE" = "p2p" ] || grep -Eiq "nat-pmp|port forwarding|port-forwarding|portforwarding" "$CONFIG"; then
+PF_ENABLED=0
+if [ "$PROFILE" = "p2p" ]; then
+  PF_ENABLED=1
+elif grep -Eiq "nat-pmp|port forwarding|port-forwarding|portforwarding" "$CONFIG"; then
+  if grep -Eiq "(nat-pmp|port[ -]?forwarding|portforwarding).*(off|false|disabled|no)" "$CONFIG"; then
+    PF_ENABLED=0
+  else
+    PF_ENABLED=1
+  fi
+fi
+
+if [ "$PF_ENABLED" = "1" ]; then
   systemctl restart proton-port.service 2>/dev/null || true
   sleep 3
   echo "Waiting for Proton forwarded port..."
@@ -92,4 +103,6 @@ if [ "$PROFILE" = "p2p" ] || grep -Eiq "nat-pmp|port forwarding|port-forwarding|
   cat /run/proton-forwarded-tcp-port 2>/dev/null || echo "not assigned yet"
   echo -n "UDP port: "
   cat /run/proton-forwarded-udp-port 2>/dev/null || echo "not assigned yet"
+else
+  systemctl stop proton-port.service 2>/dev/null || true
 fi
