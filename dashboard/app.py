@@ -251,17 +251,6 @@ def save_client_policy(ip, policy):
 def clients():
     aliases = client_names()
     policies = client_policies()
-    lease_names={}
-    for p in ["/var/lib/NetworkManager/dnsmasq-Hotspot.leases","/var/lib/misc/dnsmasq.leases","/run/NetworkManager/dnsmasq-Hotspot.leases"]:
-        if os.path.exists(p):
-            try:
-                for line in open(p):
-                    parts=line.split()
-                    if len(parts)>=4:
-                        name = parts[3] if parts[3]!="*" else f"Device {parts[2]}"
-                        lease_names[parts[2]]={"mac":parts[1],"name":name}
-            except:
-                pass
     rows=[]
     neigh=run(["ip","-4","neigh","show","dev","wlan0"],3)
     for line in neigh.splitlines():
@@ -273,13 +262,9 @@ def clients():
         if "lladdr" in parts:
             try: mac=parts[parts.index("lladdr")+1]
             except: pass
-        name=aliases.get(mac.lower()) or aliases.get(ip) or lease_names.get(ip,{}).get("name",f"Device {ip}")
+        name=aliases.get(mac.lower()) or aliases.get(ip) or f"Device {ip}"
         if ip.startswith("10.42.") or mac!="unknown":
             rows.append({"ip":ip,"mac":mac,"name":name,"state":state})
-    known={r["ip"] for r in rows}
-    for ip,d in lease_names.items():
-        if ip not in known:
-            rows.append({"ip":ip,"mac":d["mac"],"name":d["name"],"state":"leased"})
     rows = client_traffic(rows)
     for r in rows:
         r["policy"] = policies.get(r["ip"])
@@ -1064,12 +1049,25 @@ async function importVpnConfig(){
 }
 
 /* devices */
+let openDevs = new Set(), lastDevJson = "", _devs = [];
+function devKey(c){ return (c.mac && c.mac!=='unknown') ? c.mac : (c.ip||''); }
+function toggleDev(el,key){ if(openDevs.has(key)){ openDevs.delete(key); el.classList.remove('open'); } else { openDevs.add(key); el.classList.add('open'); } }
+async function renameDev(ev,key){ ev.stopPropagation();
+  const c=_devs.find(d=>devKey(d)===key); if(!c) return;
+  const cur=(c.name && !c.name.startsWith('Device')) ? c.name : '';
+  const name=prompt('Name for '+(c.ip||c.mac)+':', cur); if(name===null) return;
+  try{ const r=await fetch('/api/client-name',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mac:c.mac,ip:c.ip,name:name})});
+    const j=await r.json(); toast(j.ok?'Renamed':(j.error||'Rename failed')); if(j.ok){ lastDevJson=''; load(); }
+  }catch(e){ toast('Rename failed'); }
+}
 function renderDevices(clients){
   $('devTitle').textContent='Connected devices \u00b7 '+clients.length;
+  _devs=clients;
+  const j=JSON.stringify(clients); if(j===lastDevJson) return; lastDevJson=j;
   const box=$('deviceList');
   if(!clients.length){ box.innerHTML='<div class="status">No devices connected.</div>'; return; }
-  box.innerHTML = clients.map(c=>`
-    <div class="dev" onclick="this.classList.toggle('open')">
+  box.innerHTML = clients.map(c=>{ const k=devKey(c); return `
+    <div class="dev${openDevs.has(k)?' open':''}" onclick="toggleDev(this,'${k}')">
       <div class="devTop">
         <div><div class="devName">${(c.name||'Device')}</div><div class="devMeta">${c.ip||''} \u00b7 ${c.mac||''}</div></div>
         <div class="chev">&#8964;</div>
@@ -1079,8 +1077,10 @@ function renderDevices(clients){
         <div class="kv"><div class="k">Up</div><div class="v">${fmtBytes(c.tx)}</div></div>
         <div class="kv"><div class="k">State</div><div class="v">${c.state||'\u2014'}</div></div>
         <div class="kv"><div class="k">Policy</div><div class="v">${c.policy||'VPN'}</div></div>
+        <button class="btn ghost" data-control style="grid-column:1 / -1; padding:9px; font-size:13px" onclick="renameDev(event,'${k}')">Rename device</button>
       </div>
-    </div>`).join('');
+    </div>`; }).join('');
+  applyAuthGate();
 }
 
 /* wifi */
