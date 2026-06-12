@@ -37,21 +37,31 @@ def read(path):
 def ensure_dirs():
     os.makedirs(PERSIST_DIR, exist_ok=True)
 
+_SETTINGS_CACHE = {"time": 0.0, "value": None}
+
 def load_settings():
+    now = time.time()
+    if _SETTINGS_CACHE["value"] is not None and now - _SETTINGS_CACHE["time"] < 2.0:
+        return dict(_SETTINGS_CACHE["value"])
     try:
-        return json.load(open(SETTINGS_FILE))
+        val = json.load(open(SETTINGS_FILE))
     except Exception:
-        return {
+        val = {
             "fallback_profile": "gaming",
             "reboot_day": "off",
             "reboot_time": "04:00",
             "profile_order": ["gaming", "p2p", "streaming", "maxsec", "off"]
         }
+    _SETTINGS_CACHE["time"] = now
+    _SETTINGS_CACHE["value"] = dict(val)
+    return dict(val)
 
 def save_settings(settings):
     try:
         with open(SETTINGS_FILE, "w") as f:
             json.dump(settings, f, indent=2)
+        _SETTINGS_CACHE["time"] = 0.0
+        _SETTINGS_CACHE["value"] = None
         return True
     except Exception:
         return False
@@ -614,6 +624,7 @@ HTML2 = r"""<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ProtonPi</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
   :root{
     --bg0:#05070d; --bg1:#080b14; --card:#0f1626; --card2:#16203a;
@@ -737,6 +748,7 @@ HTML2 = r"""<!DOCTYPE html>
   .mstat{ font-family:var(--mono); font-size:13px; color:var(--muted); margin-top:10px; } .mstat b{ color:var(--text); font-size:20px; }
   .toast{ position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(10px); opacity:0; pointer-events:none; background:color-mix(in srgb,var(--primary) 24%, var(--card)); border:1px solid color-mix(in srgb,var(--primary) 45%,transparent); color:var(--text); font-weight:700; font-size:13px; padding:10px 16px; border-radius:999px; z-index:60; transition:.2s; }
   .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+  .prefRow > div{ background:rgba(255,255,255,.035); border:1px solid var(--line); border-radius:14px; padding:13px; }
   @media (max-width:760px){ .card h2{ text-align:center; } .heroStat{ text-align:center; } .big, .note, .status, .eyebrow{ text-align:center; } .legend, .palette{ justify-content:center; } }
   @media (max-width:560px){ .modal{ align-items:flex-end; padding:0; } .sheet{ border-radius:20px 20px 0 0; max-width:none; } .cmdIn{ justify-content:center; } .brand{ flex:1 1 100%; justify-content:center; text-align:center; margin-right:0; } .big{ font-size:25px; } }
 </style>
@@ -744,7 +756,7 @@ HTML2 = r"""<!DOCTYPE html>
 <body>
 <div class="cmd">
   <div class="cmdIn">
-    <div class="brand"><b>ProtonPi</b><span>router</span></div>
+    <div class="brand"><img src="/favicon.svg" alt="" style="width:24px;height:24px;align-self:center"><b>ProtonPi</b><span>router</span></div>
     <div class="state"><span class="dot" id="dot"></span><span id="stateText">Checking</span></div>
     <span class="chip" id="profChip">—</span>
     <span class="rate">&#8595; <b id="rxRate">0.0</b> &#183; &#8593; <b id="txRate">0.0</b> Mb/s</span>
@@ -831,11 +843,14 @@ HTML2 = r"""<!DOCTYPE html>
         <div class="note" id="pnote">&#8212;</div>
       </div>
       <div class="card span2">
-        <h2>Profile details &amp; management</h2>
-        <label class="f">Profile<select id="detSel" onchange="showConf()"></select></label>
-        <div class="heroRow" id="confGrid" style="margin-top:2px"></div>
-        <button class="btn danger" data-control style="width:100%;margin-top:14px" onclick="deleteSelected()">Delete selected profile</button>
-        <div class="status">Public details only &#8212; private and preshared keys are never shown.</div>
+        <h2>Startup &amp; failover</h2>
+        <div class="grid" style="gap:12px">
+          <label class="f">Startup profile (on boot)<select id="startupSel" data-control onchange="setStartupProfile()"></select></label>
+          <label class="f">Fallback if active VPN fails<select id="fallbackSel" data-control onchange="setFallbackProfile()"></select></label>
+        </div>
+        <div class="eyebrow" style="margin:6px 0 9px">Profile button order</div>
+        <div id="orderList"></div>
+        <div class="status">Order applies to the VPN control buttons and the watchdog preference.</div>
       </div>
       <div class="card span2">
         <h2>Import profile</h2>
@@ -859,6 +874,13 @@ HTML2 = r"""<!DOCTYPE html>
         <button class="btn" data-control style="width:100%;margin-top:14px" onclick="importVpnConfig()">Import profile</button>
         <div class="status" id="importStatus">Validates [Interface] / [Peer], rejects PostUp / PreUp / PostDown / PreDown.</div>
       </div>
+      <div class="card span2">
+        <h2>Profile details &amp; management</h2>
+        <label class="f">Profile<select id="detSel" onchange="showConf()"></select></label>
+        <div class="heroRow" id="confGrid" style="margin-top:2px"></div>
+        <button class="btn danger" data-control style="width:100%;margin-top:14px" onclick="deleteSelected()">Delete selected profile</button>
+        <div class="status">Public details only &#8212; private and preshared keys are never shown.</div>
+      </div>
     </div>
   </section>
 
@@ -866,6 +888,10 @@ HTML2 = r"""<!DOCTYPE html>
     <div class="card">
       <h2 id="devTitle">Connected devices</h2>
       <div id="deviceList"><div class="status">Loading&#8230;</div></div>
+    </div>
+    <div class="card" style="margin-top:13px">
+      <h2>Blocked devices</h2>
+      <div id="blockedList"><div class="status">&#8212;</div></div>
     </div>
   </section>
 
@@ -893,26 +919,66 @@ HTML2 = r"""<!DOCTYPE html>
         </div>
       </div>
 
-      <div class="card">
-        <h2>Appearance</h2>
-        <div class="eyebrow" style="margin-bottom:9px">Accent</div>
-        <div class="palette">
-          <button class="swatch" data-theme-c="blue" style="background:#4f8cff" onclick="setTheme('blue')"></button>
-          <button class="swatch" data-theme-c="green" style="background:#35d07f" onclick="setTheme('green')"></button>
-          <button class="swatch" data-theme-c="purple" style="background:#9b6cff" onclick="setTheme('purple')"></button>
-          <button class="swatch" data-theme-c="red" style="background:#ff5b6e" onclick="setTheme('red')"></button>
+      <div class="card span2">
+        <h2>Tools</h2>
+        <div class="heroRow">
+          <button class="btn ghost" data-control id="pauseBtn" style="flex:1 1 150px" onclick="togglePause()">Pause internet</button>
+          <button class="btn ghost" data-control style="flex:1 1 150px" onclick="renewP2P()">Renew P2P port</button>
+          <button class="btn ghost" data-control style="flex:1 1 150px" onclick="runDnsTest()">DNS test</button>
+        </div>
+        <div class="status" id="toolsStatus">Pause cuts client internet without dropping the VPN. Renew refreshes the NAT-PMP port mapping.</div>
+      </div>
+      <div class="card span2">
+        <h2>Backup &amp; restore</h2>
+        <div class="heroRow">
+          <a class="btn ghost" style="flex:1 1 150px; text-align:center; text-decoration:none" href="/settings.json">Export settings</a>
+          <button class="btn ghost" data-control style="flex:1 1 150px" onclick="importSettingsPrompt()">Import settings</button>
+          <button class="btn ghost" data-control style="flex:1 1 150px" onclick="createFullBackup()">Create full backup</button>
+          <a class="btn ghost" style="flex:1 1 150px; text-align:center; text-decoration:none" href="/backup.tar.gz">Download latest backup</a>
+        </div>
+        <label class="f" style="margin-top:12px">Restore from backup<select id="backupSel" data-control onfocus="loadBackups()"><option value="">Load backup list&#8230;</option></select></label>
+        <button class="btn danger" data-control style="width:100%" onclick="restoreSelectedBackup()">Restore selected backup</button>
+        <div class="status" id="backupStatus">Restores VPN profiles, dashboard, services, firewall rules, and settings.</div>
+      </div>
+      <div class="card span2">
+        <h2>Preferences</h2>
+        <div class="prefRow" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:14px; align-items:stretch">
+          <div>
+            <div class="eyebrow" style="margin-bottom:9px">Accent color</div>
+            <div class="palette">
+              <button class="swatch" data-theme-c="blue" style="background:#4f8cff" onclick="setTheme('blue')"></button>
+              <button class="swatch" data-theme-c="green" style="background:#35d07f" onclick="setTheme('green')"></button>
+              <button class="swatch" data-theme-c="purple" style="background:#9b6cff" onclick="setTheme('purple')"></button>
+              <button class="swatch" data-theme-c="red" style="background:#ff5b6e" onclick="setTheme('red')"></button>
+            </div>
+          </div>
+          <div>
+            <div class="eyebrow" style="margin-bottom:9px">Scheduled reboot</div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap">
+              <label class="f" style="flex:1 1 120px; margin:0">Day<select id="rebootDay" data-control onchange="saveReboot()"><option value="off">Off</option><option value="daily">Daily</option><option value="sunday">Sunday</option></select></label>
+              <label class="f" style="flex:1 1 110px; margin:0">Time<input id="rebootTime" type="time" data-control value="04:00" onchange="saveReboot()"></label>
+            </div>
+          </div>
+          <div>
+            <div class="eyebrow" style="margin-bottom:9px">Dashboard domain</div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap">
+              <label class="f" style="flex:2 1 170px; margin:0">Domain<input id="domainInput" data-control placeholder="protonpi.local"></label>
+              <button class="btn" data-control style="flex:1 1 110px; align-self:end" onclick="applyDomain()">Apply</button>
+            </div>
+            <div class="status" id="domainStatus" style="margin-top:8px">Default: protonpi.local (always available). Custom domains resolve for hotspot clients.</div>
+          </div>
         </div>
       </div>
 
-      <div class="card">
-        <h2>Scheduled reboot</h2>
-        <label class="f">Day<select id="rebootDay" data-control onchange="saveReboot()"><option value="off">Off</option><option value="daily">Daily</option><option value="sunday">Sunday</option></select></label>
-        <label class="f">Time<input id="rebootTime" type="time" data-control value="04:00" onchange="saveReboot()"></label>
-      </div>
-
-      <div class="card">
-        <h2>Access</h2>
+      <div class="card span2">
+        <h2>Access &amp; maintenance</h2>
         <button class="btn ghost" data-control style="width:100%" onclick="changePassword()">Change dashboard password</button>
+        <div class="heroRow" style="margin-top:10px">
+          <a class="btn ghost" style="flex:1 1 130px; text-align:center; text-decoration:none" href="/protonpi.crt">Download HTTPS cert</a>
+          <a class="btn ghost" style="flex:1 1 130px; text-align:center; text-decoration:none" href="/diagnostics.txt">Diagnostics</a>
+          <a class="btn ghost" style="flex:1 1 130px; text-align:center; text-decoration:none" href="/logout">Logout</a>
+        </div>
+        <button class="btn danger" data-control style="width:100%; margin-top:10px" onclick="safeMode()">Safe mode (VPN off + hotspot down)</button>
       </div>
     </div>
   </section>
@@ -950,7 +1016,8 @@ function agoFmt(sec){ sec=+sec; if(sec<60) return sec+"s ago"; if(sec<3600) retu
 function showTab(btn,id){
   document.querySelectorAll('.tab').forEach(t=>t.setAttribute('aria-selected', t===btn));
   document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active', p.id===id));
-  if(id==='network') loadWifi();
+  if(id==='network'){ loadWifi(); loadBackups(); }
+  if(id==='devices') loadBlocked();
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
@@ -991,7 +1058,7 @@ async function loadProfiles(){
 }
 function renderProfiles(){
   const wrap=$('pbtns'); wrap.innerHTML='';
-  profilesCache.forEach(p=>{
+  orderedProfiles().forEach(p=>{
     const b=document.createElement('button');
     b.className='pbtn '+(['gaming','p2p','streaming','maxsec'].includes(p.name)?p.name:'');
     b.textContent=p.label||p.name;
@@ -1078,9 +1145,150 @@ function renderDevices(clients){
         <div class="kv"><div class="k">State</div><div class="v">${c.state||'\u2014'}</div></div>
         <div class="kv"><div class="k">Policy</div><div class="v">${c.policy||'VPN'}</div></div>
         <button class="btn ghost" data-control style="grid-column:1 / -1; padding:9px; font-size:13px" onclick="renameDev(event,'${k}')">Rename device</button>
+        <div style="grid-column:1 / -1; display:grid; grid-template-columns:repeat(4,1fr); gap:8px">
+          <button class="btn ghost" data-control style="padding:8px 6px; font-size:12px" onclick="devCtl(event,'${k}','${c.policy==='Blocked'?'unblock':'block'}')">${c.policy==='Blocked'?'Unblock':'Block'}</button>
+          <button class="btn ghost" data-control style="padding:8px 6px; font-size:12px" onclick="devCtl(event,'${k}','prioritize')">Prioritize</button>
+          <button class="btn ghost" data-control style="padding:8px 6px; font-size:12px" onclick="devCtl(event,'${k}','limit')">Limit&#8230;</button>
+          <button class="btn ghost" data-control style="padding:8px 6px; font-size:12px" onclick="devCtl(event,'${k}','clear_limit')">Clear</button>
+        </div>
       </div>
     </div>`; }).join('');
   applyAuthGate();
+}
+
+/* startup, fallback, profile order */
+let profileOrder=[], _lastOrderJson='', _paused=false;
+function orderedProfiles(){
+  const idx=n=>{ const i=profileOrder.indexOf(n); return i<0?999:i; };
+  return profilesCache.slice().sort((a,b)=>idx(a.name)-idx(b.name));
+}
+function syncPriorityUI(s){
+  profileOrder=(s.settings&&Array.isArray(s.settings.profile_order))?s.settings.profile_order:[];
+  const mk=(id,cur)=>{ const el=$(id); if(!el||document.activeElement===el) return;
+    const opts=orderedProfiles().map(p=>`<option value="${p.name}">${p.label||p.name}</option>`).join('')+'<option value="off">VPN off</option>';
+    if(el.innerHTML!==opts) el.innerHTML=opts;
+    if(cur && el.value!==cur) el.value=cur; };
+  mk('startupSel', s.default_profile||'off');
+  mk('fallbackSel', (s.settings&&s.settings.fallback_profile)||'off');
+  const oj=JSON.stringify([profileOrder,profilesCache.map(p=>p.name)]);
+  if(oj!==_lastOrderJson){ _lastOrderJson=oj; renderOrderEditor(); }
+}
+function renderOrderEditor(){
+  const box=$('orderList'); if(!box) return;
+  box.innerHTML=orderedProfiles().map((p,i,arr)=>`
+    <div style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:11px;padding:8px 11px;margin-bottom:8px">
+      <b style="flex:1">${p.label||p.name}</b>
+      <button class="btn ghost" data-control style="padding:6px 12px" ${i===0?'disabled':''} onclick="moveProfile('${p.name}',-1)">&#9650;</button>
+      <button class="btn ghost" data-control style="padding:6px 12px" ${i===arr.length-1?'disabled':''} onclick="moveProfile('${p.name}',1)">&#9660;</button>
+    </div>`).join('');
+  applyAuthGate();
+}
+async function moveProfile(name,dir){
+  const names=orderedProfiles().map(p=>p.name);
+  const i=names.indexOf(name), j=i+dir;
+  if(i<0||j<0||j>=names.length) return;
+  [names[i],names[j]]=[names[j],names[i]];
+  profileOrder=names.slice(); _lastOrderJson=''; renderOrderEditor(); renderProfiles();
+  try{ const r=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profile_order:names.concat(['off'])})});
+    const j2=await r.json(); if(!j2.ok) toast(j2.error||'Save failed'); else toast('Order saved');
+  }catch(e){ toast('Save failed'); }
+}
+async function setStartupProfile(){
+  try{ const r=await fetch('/api/default-profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profile:$('startupSel').value})});
+    const j=await r.json(); toast(j.ok?'Startup profile saved':(j.error||'Failed'));
+  }catch(e){ toast('Failed'); }
+}
+async function setFallbackProfile(){
+  try{ const r=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fallback_profile:$('fallbackSel').value})});
+    const j=await r.json(); toast(j.ok?'Fallback saved':(j.error||'Failed'));
+  }catch(e){ toast('Failed'); }
+}
+
+/* tools */
+async function doAction(a){
+  try{ const r=await fetch('/api/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:a})});
+    const j=await r.json(); const msg=j.ok?(j.message||'Done'):(j.error||'Failed');
+    setText('toolsStatus', msg); toast(msg); load(); return j;
+  }catch(e){ setText('toolsStatus','Request failed'); }
+}
+function togglePause(){ doAction(_paused?'resume_internet':'pause_internet'); }
+function renewP2P(){ doAction('renew_p2p'); }
+function safeMode(){ if(confirm('Safe mode turns the VPN off, takes the hotspot down, and restarts NetworkManager. You may lose access over Wi-Fi. Continue?')) doAction('safe_mode'); }
+async function runDnsTest(){ setText('toolsStatus','Testing DNS\u2026');
+  try{ const r=await fetch('/api/dns-test',{method:'POST'}); const j=await r.json();
+    setText('toolsStatus', j.message||(j.ok?'DNS OK':'DNS failed'));
+  }catch(e){ setText('toolsStatus','DNS test failed'); }
+}
+
+/* backup & restore */
+async function loadBackups(){
+  try{ const r=await fetch('/api/backups'); const j=await r.json();
+    const list=(j&&j.backups)||[];
+    $('backupSel').innerHTML = list.length ? list.map(b=>`<option value="${b.name}">${b.name} (${fmtBytes(b.size)})</option>`).join('') : '<option value="">No backups found</option>';
+  }catch(e){ $('backupSel').innerHTML='<option value="">Failed to load</option>'; }
+}
+async function createFullBackup(){ setText('backupStatus','Creating backup\u2026 this can take a minute.');
+  try{ const r=await fetch('/api/create-backup',{method:'POST'}); const j=await r.json();
+    setText('backupStatus', j.ok?('Created '+(j.name||'backup')):(j.error||'Backup failed')); loadBackups();
+  }catch(e){ setText('backupStatus','Backup failed'); }
+}
+async function restoreSelectedBackup(){
+  const name=$('backupSel').value; if(!name){ toast('Pick a backup first'); return; }
+  if(!confirm('Restore "'+name+'"? This overwrites profiles, settings, and services, then restarts the dashboard.')) return;
+  setText('backupStatus','Restoring\u2026');
+  try{ const r=await fetch('/api/restore-backup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name})});
+    const j=await r.json(); setText('backupStatus', j.ok?(j.message||'Restored'):(j.error||'Restore failed'));
+  }catch(e){ setText('backupStatus','Restore failed'); }
+}
+async function importSettingsPrompt(){
+  const raw=prompt('Paste exported settings JSON:'); if(!raw) return;
+  try{ const parsed=JSON.parse(raw);
+    const r=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(parsed)});
+    const j=await r.json(); toast(j.ok?'Settings imported':(j.error||'Import failed')); if(j.ok) load();
+  }catch(e){ toast('Invalid JSON'); }
+}
+
+/* device policies */
+async function devCtl(ev,key,action){ ev.stopPropagation();
+  const c=_devs.find(d=>devKey(d)===key); if(!c||!c.ip) return;
+  let mbps='';
+  if(action==='limit'){ mbps=prompt('Download limit for '+(c.name||c.ip)+' (Mbps):',''); if(mbps===null||mbps==='') return; }
+  if(action==='block' && !confirm('Block '+(c.name||c.ip)+' from the internet?')) return;
+  try{ const r=await fetch('/api/device-control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:action,ip:c.ip,mbps:mbps})});
+    const j=await r.json(); toast(j.ok?(j.message||'Done'):(j.error||'Failed'));
+    lastDevJson=''; load(); loadBlocked();
+  }catch(e){ toast('Failed'); }
+}
+async function loadBlocked(){
+  const box=$('blockedList'); if(!box) return;
+  try{ const r=await fetch('/api/client-policies'); const j=await r.json();
+    const pol=(j&&j.policies)||{}, names=(j&&j.names)||{};
+    const rows=Object.entries(pol).filter(([ip,p])=>p==='Blocked');
+    box.innerHTML = rows.length ? rows.map(([ip])=>`
+      <div style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:11px;padding:9px 11px;margin-bottom:8px">
+        <div style="flex:1"><b>${names[ip]||'Device'}</b><div class="devMeta">${ip}</div></div>
+        <button class="btn ghost" data-control style="padding:8px 14px" onclick="unblockIp('${ip}')">Unblock</button>
+      </div>`).join('') : '<div class="status">No blocked devices.</div>';
+    applyAuthGate();
+  }catch(e){ box.innerHTML='<div class="status">Unavailable</div>'; }
+}
+async function unblockIp(ip){
+  try{ const r=await fetch('/api/device-control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'unblock',ip:ip})});
+    const j=await r.json(); toast(j.ok?'Unblocked':(j.error||'Failed')); lastDevJson=''; load(); loadBlocked();
+  }catch(e){ toast('Failed'); }
+}
+
+/* dashboard domain */
+async function applyDomain(){
+  const d=($('domainInput').value||'').trim().toLowerCase() || 'protonpi.local';
+  if(!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/.test(d)){ toast('Enter a valid domain like myrouter.lan'); return; }
+  if(!confirm('Apply domain "'+d+'"? Everything is validated first; the hotspot and dashboard then restart (Wi-Fi clients reconnect). If anything fails it rolls back automatically and protonpi.local / 10.42.0.1 keep working.')) return;
+  setText('domainStatus','Validating\u2026');
+  try{ const r=await fetch('/api/domain',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:d})});
+    const j=await r.json();
+    if(j.ok){ setText('domainStatus',(j.message||'Applying\u2026')+' Redirecting in 15s\u2026'); setTimeout(()=>{ location.href='https://'+d+'/'; }, 15000); }
+    else setText('domainStatus', j.error||'Validation failed \u2014 nothing was changed.');
+  }catch(e){ setText('domainStatus','Connection dropped during apply \u2014 open https://'+d+' (or protonpi.local / 10.42.0.1) shortly.'); setTimeout(()=>{ location.href='https://'+d+'/'; }, 15000); }
 }
 
 /* wifi */
@@ -1252,6 +1460,9 @@ async function load(){
   renderDevices(s.clients||[]);
   setText('pnote', PROFILE_NOTES[s.profile] || ('Active profile: '+(s.profile_label||s.profile)));
 
+  _paused=!!s.internet_paused; const pb=$('pauseBtn'); if(pb) pb.textContent=_paused?'Resume internet':'Pause internet';
+  syncPriorityUI(s);
+  const di=$('domainInput'); if(di && document.activeElement!==di && !di.value) di.value=(s.settings&&s.settings.custom_domain)||'protonpi.local';
   if(s.settings){ if($('rebootDay').value!==(s.settings.reboot_day||'off')) $('rebootDay').value=s.settings.reboot_day||'off'; if(document.activeElement!==$('rebootTime')) $('rebootTime').value=s.settings.reboot_time||'04:00'; }
   lastStatus=s;
 }
@@ -1523,6 +1734,109 @@ def api_client_name():
     return jsonify({"ok":False,"error":"Could not save client name"}),500
 
 
+DOMAIN_RE = r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$"
+DOMAIN_DNSMASQ_CONF = "/etc/NetworkManager/dnsmasq-shared.d/protonpi-domain.conf"
+CERT_CRT = "/etc/protonpi-dashboard/certs/protonpi.crt"
+CERT_KEY = "/etc/protonpi-dashboard/certs/protonpi.key"
+
+def _gen_and_validate_cert(domain):
+    tmp_crt, tmp_key = CERT_CRT + ".new", CERT_KEY + ".new"
+    san = "subjectAltName=DNS:protonpi.local,IP:10.42.0.1"
+    if domain != "protonpi.local":
+        san = "subjectAltName=DNS:protonpi.local,DNS:%s,IP:10.42.0.1" % domain
+    run(["openssl", "req", "-x509", "-nodes", "-newkey", "rsa:2048",
+         "-keyout", tmp_key, "-out", tmp_crt, "-days", "825",
+         "-subj", "/CN=%s" % domain, "-addext", san], 40)
+    if not (os.path.exists(tmp_crt) and os.path.exists(tmp_key)):
+        return False, "openssl did not produce the certificate files"
+    if "subject=" not in run(["openssl", "x509", "-in", tmp_crt, "-noout", "-subject"], 10):
+        return False, "generated certificate failed to parse"
+    mod_c = run(["openssl", "x509", "-in", tmp_crt, "-noout", "-modulus"], 10)
+    mod_k = run(["openssl", "rsa", "-in", tmp_key, "-noout", "-modulus"], 10)
+    if not mod_c.startswith("Modulus=") or mod_c != mod_k:
+        return False, "certificate/key pair mismatch"
+    return True, ""
+
+
+@app.route("/api/domain", methods=["POST"])
+def api_domain():
+    auth = require_control_auth()
+    if auth: return auth
+    if blocked_when_locked():
+        return jsonify({"ok": False, "error": "Dashboard is locked or read-only"}), 403
+    d = (request.get_json(force=True).get("domain") or "").strip().lower()
+    if not re.match(DOMAIN_RE, d) or len(d) > 100:
+        return jsonify({"ok": False, "error": "Invalid domain (use something like myrouter.lan)"}), 400
+
+    ok, err = _gen_and_validate_cert(d)
+    if not ok:
+        for p in (CERT_CRT + ".new", CERT_KEY + ".new"):
+            try: os.remove(p)
+            except Exception: pass
+        return jsonify({"ok": False, "error": "Certificate validation failed: " + err}), 500
+
+    if d != "protonpi.local":
+        try:
+            os.makedirs(os.path.dirname(DOMAIN_DNSMASQ_CONF), exist_ok=True)
+            with open(DOMAIN_DNSMASQ_CONF + ".new", "w") as f:
+                f.write("address=/%s/10.42.0.1\n" % d)
+        except Exception as e:
+            return jsonify({"ok": False, "error": "Could not write dnsmasq config: %s" % e}), 500
+        chk = run(["/usr/sbin/dnsmasq", "--test", "--conf-file=" + DOMAIN_DNSMASQ_CONF + ".new"], 10)
+        if "syntax check OK" not in chk:
+            try: os.remove(DOMAIN_DNSMASQ_CONF + ".new")
+            except Exception: pass
+            return jsonify({"ok": False, "error": "dnsmasq rejected the config: %s" % (chk or "dnsmasq not found")}), 500
+
+    settings = load_settings()
+    settings["custom_domain"] = d
+    if not save_settings(settings):
+        return jsonify({"ok": False, "error": "Could not save settings"}), 500
+
+    ts = time.strftime("%Y%m%d-%H%M%S")
+    helper = "/run/protonpi-domain-apply.sh"
+    script = """#!/bin/sh
+LOG=/run/protonpi-domain-apply.log
+exec >"$LOG" 2>&1
+set -x
+CRT='{crt}'; KEY='{key}'; CONF='{conf}'; DOM='{dom}'; TS='{ts}'
+cp "$CRT" "$CRT.bak.$TS" 2>/dev/null
+cp "$KEY" "$KEY.bak.$TS" 2>/dev/null
+mv "$CRT.new" "$CRT"
+mv "$KEY.new" "$KEY"
+if [ "$DOM" = "protonpi.local" ]; then
+  rm -f "$CONF" "$CONF.new"
+else
+  mv "$CONF.new" "$CONF"
+fi
+nmcli connection down Hotspot
+sleep 2
+if ! nmcli connection up Hotspot; then
+  rm -f "$CONF"
+  nmcli connection up Hotspot
+fi
+systemctl restart vpn-dashboard-https.service
+sleep 3
+if ! systemctl is-active --quiet vpn-dashboard-https.service; then
+  cp "$CRT.bak.$TS" "$CRT" 2>/dev/null
+  cp "$KEY.bak.$TS" "$KEY" 2>/dev/null
+  rm -f "$CONF"
+  systemctl restart vpn-dashboard-https.service
+fi
+systemctl is-active --quiet avahi-daemon || systemctl restart avahi-daemon
+""".format(crt=CERT_CRT, key=CERT_KEY, conf=DOMAIN_DNSMASQ_CONF, dom=d, ts=ts)
+    try:
+        with open(helper, "w") as f:
+            f.write(script)
+        os.chmod(helper, 0o700)
+    except Exception as e:
+        return jsonify({"ok": False, "error": "Could not stage apply script: %s" % e}), 500
+    subprocess.Popen(["/bin/sh", "-c", "sleep 1; /bin/sh " + helper])
+    return jsonify({"ok": True, "message":
+        "Validated. Applying in the background. If https://%s does not load in ~30 seconds, "
+        "https://protonpi.local and https://10.42.0.1 still work (auto-rollback)." % d})
+
+
 @app.route("/api/change-password", methods=["POST"])
 def api_change_password():
     auth = require_control_auth()
@@ -1551,6 +1865,13 @@ def api_change_password():
     return jsonify({"ok":False,"error":"Could not save password"}),500
 
 
+@app.route("/api/client-policies")
+def api_client_policies():
+    auth = require_control_auth()
+    if auth: return auth
+    return jsonify({"ok": True, "policies": client_policies(), "names": client_names()})
+
+
 @app.route("/api/device-control", methods=["POST"])
 def api_device_control():
     auth = require_control_auth()
@@ -1566,12 +1887,14 @@ def api_device_control():
 
     if action in ["block", "unblock"]:
         out = run(["/usr/local/sbin/protonpi-device-control", action, ip], 10)
-        if action == "block":
-            save_client_policy(ip, "Blocked")
-        elif action == "unblock":
-            save_client_policy(ip, None)
+        save_client_policy(ip, "Blocked" if action == "block" else None)
         run(["/usr/local/sbin/protonpi-apply-limits"], 10)
         return jsonify({"ok":True,"output":out})
+
+    if action in ["prioritize", "limit", "clear_limit"]:
+        # Policy changes lift any existing firewall block first so the stored
+        # label and the iptables state can never disagree.
+        run(["/usr/local/sbin/protonpi-device-control", "unblock", ip], 10)
 
     if action == "prioritize":
         save_client_policy(ip, "Prioritized")
@@ -1642,60 +1965,14 @@ def api_lock():
 
 
 
-def profile_display_from_conf(text, fallback):
-    skip_words = [
-        "netshield", "moderate nat", "nat-pmp", "port forwarding",
-        "vpn accelerator", "secure core", "protocol", "platform",
-        "generated", "wireguard", "router"
-    ]
-
-    # Prefer explicit name-like comments inside the config.
-    for line in text.splitlines():
-        raw = line.strip()
-        if not raw:
-            continue
-
-        if raw.startswith("#"):
-            val = raw.lstrip("#").strip()
-            low = val.lower()
-            if not val:
-                continue
-            if any(w in low for w in skip_words):
-                continue
-            if len(val) <= 64:
-                return val
-
-        if raw.lower().startswith("name") and "=" in raw:
-            val = raw.split("=", 1)[1].strip()
-            if val:
-                return val[:64]
-
-    # Fallback to Endpoint host if useful.
-    for line in text.splitlines():
-        raw = line.strip()
-        if raw.lower().startswith("endpoint") and "=" in raw:
-            val = raw.split("=", 1)[1].strip().split(":")[0].strip("[]")
-            if val:
-                return val[:64]
-
-    return fallback
-
-def slugify_profile_name(name):
-    name = name.strip().lower()
-    name = re.sub(r"[^a-z0-9._-]+", "-", name)
-    name = re.sub(r"-+", "-", name).strip("-._")
-    if not name:
-        name = "imported-profile"
-    return name[:40]
-
-def read_profile_display(profile):
-    path = os.path.join("/etc/protonvpn-profiles", profile + ".conf")
-    try:
-        text = open(path, "r", errors="ignore").read()
-        return profile_display_from_conf(text, profile)
-    except Exception:
-        return profile
-
+def clean_profile_label(value, fallback="Imported Profile"):
+    value = str(value or "").replace("\\n", " ").replace("\n", " ").replace("\r", " ")
+    value = re.sub(r"\s+", " ", value).strip(" #:\t")
+    value = re.sub(r"(?i)^key\s+for\s+", "", value).strip()
+    value = re.sub(r"(?i)^wireguard\s+config\s+for\s+", "", value).strip()
+    if not value:
+        value = fallback
+    return value[:48]
 
 PROFILE_DIR = "/etc/protonvpn-profiles"
 PROFILE_META_PATH = os.path.join(PROFILE_DIR, "profile-meta.json")
@@ -1707,14 +1984,6 @@ CORE_LABELS = {
     "maxsec": "Max Security"
 }
 
-def clean_profile_label(value, fallback="Imported Profile"):
-    value = str(value or "").replace("\\n", " ").replace("\n", " ").replace("\r", " ")
-    value = re.sub(r"\s+", " ", value).strip(" #:\t")
-    value = re.sub(r"(?i)^key\s+for\s+", "", value).strip()
-    value = re.sub(r"(?i)^wireguard\s+config\s+for\s+", "", value).strip()
-    if not value:
-        value = fallback
-    return value[:48]
 
 def profile_display_from_conf(text, fallback):
     fallback = clean_profile_label(os.path.splitext(fallback or "Imported Profile")[0])
@@ -2334,6 +2603,15 @@ def protonpi_cert():
         })
     except Exception as e:
         return Response(f"Certificate not found: {e}", status=500)
+
+FAVICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="ProtonPi"><path d="M32 4 L56 13 V31 C56 46 45.5 55 32 60 C18.5 55 8 46 8 31 V13 Z" fill="#4f8cff"/><path d="M18 24 H46 M24 24 V44 M40 24 V41 a4 4 0 0 0 5 3.5" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+
+
+@app.route("/favicon.svg")
+def favicon_svg():
+    return Response(FAVICON_SVG, mimetype="image/svg+xml",
+                    headers={"Cache-Control": "max-age=86400"})
+
 
 @app.route("/wifi-qr.png")
 def wifi_qr():
