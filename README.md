@@ -9,33 +9,36 @@ Turn a Raspberry Pi into a self-hosted Proton VPN Wi-Fi router with a live HTTPS
 **VPN routing**
 - Full WireGuard tunnel routing through Proton VPN for all connected devices
 - One-tap profile switching: Gaming, P2P, Streaming, Max Security, or any custom profile imported from a `.conf`
+- Startup profile (applied on boot), fallback profile if the active tunnel fails, and a drag-free profile order editor
 - Kill switch — if the tunnel drops, traffic is blocked, not leaked
-- NAT-PMP port forwarding for P2P clients (automatically reads the assigned TCP/UDP port)
+- NAT-PMP port forwarding for P2P clients (automatically reads the assigned TCP/UDP port), with one-tap renewal
 - VPN watchdog with automatic reconnect and fallback profile on tunnel failure
 
 **Live dashboard**
-- Served at `https://protonpi.local` over self-signed TLS
-- Command bar: live connection state, active profile, real-time ↓/↑ throughput
-- **Overview tab**: tunnel health (exit IP, server node, WireGuard handshake age, latency, packet loss, DNS check, port-forwarding state), cumulative session traffic, 1-second live traffic graph, CPU temp, CPU load, memory, and storage
-- **Profiles tab**: dynamic profile buttons, per-profile WireGuard conf details, one-click import of custom `.conf` files with color selection, safe delete
-- **Devices tab**: connected hotspot clients with per-device traffic totals and policy
+- Served at `https://protonpi.local` over self-signed TLS, with a custom dashboard domain option (validated apply with automatic rollback — `protonpi.local` and `10.42.0.1` always keep working)
+- Command bar: live connection state, active profile, real-time ↓/↑ throughput, power menu (VPN off, hotspot restart, reboot, shutdown)
+- **Overview tab**: tunnel health (exit IP, server node, WireGuard handshake age, latency, packet loss, DNS check, port-forwarding state), session traffic totals, a 1-second live traffic graph with 5 minutes of server-side history that survives page refreshes, CPU temp, CPU load, memory, and storage
+- **Profiles tab**: dynamic profile buttons, per-profile WireGuard conf details, one-click import of custom `.conf` files with color selection, safe delete, startup/failover controls
+- **Devices tab**: connected hotspot clients with per-device traffic totals, rename, block/unblock with a blocked-devices list, prioritize, per-device download limits, and per-device or all-device statistics clearing
 - **Network tab**: Wi-Fi SSID, password, band (2.4 GHz / 5 GHz / auto), channel, and WPA2/WPA3 security — all configurable from the dashboard; scan-to-join QR code updates live
-- Rolling history graphs for CPU temp, CPU load, and memory (last ~5 minutes, tap any tile)
-- Speed test through the active tunnel
+- Tools: pause/resume client internet, renew P2P port, DNS test, speed test through the active tunnel
+- Rolling history graphs for CPU temp, CPU load, and memory (tap any tile)
+- Collapsible cards that remember their state per browser, accent color themes, mobile-friendly layout
 
 **Access control**
 - Dashboard login with hashed password; trusted-device session tokens
 - All control endpoints require authentication; read-only visitors see live status with controls disabled
 - Dashboard lock mode for display-only use
+- Download the HTTPS certificate, diagnostics report, and one-tap safe mode from the dashboard
 
 **Hotspot and routing**
 - Wi-Fi AP via NetworkManager (SSID `ProtonPi`, 5 GHz band a, channel 36 by default — configurable from the dashboard)
 - Subnet `10.42.0.0/24`, gateway `10.42.0.1`
-- Per-device traffic policies (VPN, direct, or blocked)
+- Per-device traffic policies enforced with iptables (block, prioritize, bandwidth limit)
 - Scheduled automatic reboot (configurable day and time)
 
 **System**
-- Backup and restore of profiles and settings
+- Backup and restore from the dashboard: export/import settings, create and download full backups, restore from a list
 - Automated `protonpi-health` check script
 - Separate systemd units for the dashboard, HTTP→HTTPS redirect, VPN watchdog timer, and VPN autostart
 
