@@ -1,6 +1,6 @@
 # ProtonPi Router
 
-Turn a Raspberry Pi into a self-hosted Proton VPN Wi-Fi router with a live HTTPS dashboard. ProtonPi routes all hotspot traffic through a WireGuard VPN tunnel, lets you switch server profiles in one tap, and gives you a real-time view of traffic, devices, and system health — all from a mobile-friendly web interface on your local network.
+Turn a Raspberry Pi into a self-hosted Proton VPN Wi-Fi router with a live HTTPS dashboard. ProtonPi routes all hotspot traffic through a WireGuard VPN tunnel, lets you switch server profiles in one tap, and gives you a real-time view of traffic, devices, and system health, all from a mobile-friendly web interface on your local network.
 
 ---
 
@@ -10,17 +10,17 @@ Turn a Raspberry Pi into a self-hosted Proton VPN Wi-Fi router with a live HTTPS
 - Full WireGuard tunnel routing through Proton VPN for all connected devices
 - One-tap profile switching: Gaming, P2P, Streaming, Max Security, or any custom profile imported from a `.conf`
 - Startup profile (applied on boot), fallback profile if the active tunnel fails, and a drag-free profile order editor
-- Kill switch — if the tunnel drops, traffic is blocked, not leaked
+- Kill switch: if the tunnel drops, traffic is blocked, not leaked
 - NAT-PMP port forwarding for P2P clients (automatically reads the assigned TCP/UDP port), with one-tap renewal
 - VPN watchdog with automatic reconnect and fallback profile on tunnel failure
 
 **Live dashboard**
-- Served at `https://protonpi.local` over self-signed TLS, with a custom dashboard domain option (validated apply with automatic rollback — `protonpi.local` and `10.42.0.1` always keep working)
+- Served at `https://protonpi.local` over self-signed TLS, with a custom dashboard domain option (validated apply with automatic rollback; `protonpi.local` and `10.42.0.1` always keep working)
 - Command bar: live connection state, active profile, real-time ↓/↑ throughput, power menu (VPN off, hotspot restart, reboot, shutdown)
 - **Overview tab**: tunnel health (exit IP, server node, WireGuard handshake age, latency, packet loss, DNS check, port-forwarding state), session traffic totals, a 1-second live traffic graph with 5 minutes of server-side history that survives page refreshes, CPU temp, CPU load, memory, and storage
 - **Profiles tab**: dynamic profile buttons, per-profile WireGuard conf details, one-click import of custom `.conf` files with color selection, safe delete, startup/failover controls
 - **Devices tab**: connected hotspot clients with per-device traffic totals, rename, block/unblock with a blocked-devices list, prioritize, per-device download limits, and per-device or all-device statistics clearing
-- **Network tab**: Wi-Fi SSID, password, band (2.4 GHz / 5 GHz / auto), channel, and WPA2/WPA3 security — all configurable from the dashboard; scan-to-join QR code updates live
+- **Network tab**: Wi-Fi SSID, password, band (2.4 GHz / 5 GHz / auto), channel, and WPA2/WPA3 security, all configurable from the dashboard; scan-to-join QR code updates live
 - Tools: pause/resume client internet, renew P2P port, DNS test, speed test through the active tunnel
 - Rolling history graphs for CPU temp, CPU load, and memory (tap any tile)
 - Collapsible cards that remember their state per browser, accent color themes, mobile-friendly layout
@@ -32,7 +32,7 @@ Turn a Raspberry Pi into a self-hosted Proton VPN Wi-Fi router with a live HTTPS
 - Download the HTTPS certificate, diagnostics report, and one-tap safe mode from the dashboard
 
 **Hotspot and routing**
-- Wi-Fi AP via NetworkManager (SSID `ProtonPi`, 5 GHz band a, channel 36 by default — configurable from the dashboard)
+- Wi-Fi AP via NetworkManager (SSID `ProtonPi`, 5 GHz band a, channel 36 by default, configurable from the dashboard)
 - Subnet `10.42.0.0/24`, gateway `10.42.0.1`
 - Per-device traffic policies enforced with iptables (block, prioritize, bandwidth limit)
 - Scheduled automatic reboot (configurable day and time)
@@ -67,7 +67,7 @@ The installer sets up dependencies (WireGuard, Flask, NetworkManager, qrencode, 
 
 **After install:**
 
-1. Add your Proton VPN WireGuard configs to `/etc/protonvpn-profiles/` — one `.conf` per server profile.
+1. Add your Proton VPN WireGuard configs to `/etc/protonvpn-profiles/`, one `.conf` per server profile.
 2. Set the dashboard password:
    ```bash
    sudo protonpi-set-password 'your-password'
@@ -102,7 +102,7 @@ install.sh                Automated installer
 - Dashboard runs over HTTPS with a self-signed certificate generated at install time.
 - All WireGuard private keys and preshared keys stay in `/etc/protonvpn-profiles/` and `/etc/wireguard/`, which are `chmod 700`. The dashboard never exposes them.
 - The profile details view shows only public conf fields (endpoint, allowed IPs, DNS, port-forwarding support).
-- Do not commit secrets to the repo — the `.gitignore` covers all `.conf`, `.key`, `.crt`, `.pem`, auth JSON, and backup archive files.
+- Do not commit secrets to the repo - the `.gitignore` covers all `.conf`, `.key`, `.crt`, `.pem`, auth JSON, and backup archive files.
 
 Files to keep private on the Pi (already gitignored):
 
