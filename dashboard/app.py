@@ -165,9 +165,9 @@ def mem_percent():
 def disk_percent():
     try:
         st=os.statvfs("/")
-        total=st.f_blocks*st.f_frsize
-        free=st.f_bavail*st.f_frsize
-        return round((1-free/total)*100,1)
+        used=(st.f_blocks-st.f_bfree)*st.f_frsize
+        avail=st.f_bavail*st.f_frsize
+        return round(used/(used+avail)*100,1)
     except:
         return 0
 
@@ -706,8 +706,8 @@ HTML2 = r"""<!DOCTYPE html>
   .dev:last-child{ margin-bottom:0; }
   .devTop{ display:flex; justify-content:space-between; align-items:center; gap:12px; }
   .devName{ font-weight:800; } .devMeta{ font-family:var(--mono); font-size:12px; color:var(--muted); margin-top:2px; }
-  .chev{ width:26px; height:26px; flex:0 0 26px; display:grid; place-items:center; border-radius:50%; background:rgba(255,255,255,.07); border:1px solid var(--line); color:var(--muted); transition:transform .2s; }
-  .dev.open .chev{ transform:rotate(180deg); color:var(--text); }
+  .chev{ width:26px; height:26px; flex:0 0 26px; display:grid; place-items:center; border-radius:50%; background:rgba(255,255,255,.07); border:1px solid var(--line); color:var(--muted); transform:rotate(-90deg); transition:transform .2s; }
+  .dev.open .chev{ transform:rotate(0deg); color:var(--text); }
   .devBody{ display:none; margin-top:11px; gap:9px; grid-template-columns:1fr 1fr; }
   .dev.open .devBody{ display:grid; }
   .kv{ background:rgba(255,255,255,.035); border:1px solid var(--line); border-radius:11px; padding:9px; }
@@ -748,6 +748,11 @@ HTML2 = r"""<!DOCTYPE html>
   .mstat{ font-family:var(--mono); font-size:13px; color:var(--muted); margin-top:10px; } .mstat b{ color:var(--text); font-size:20px; }
   .toast{ position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(10px); opacity:0; pointer-events:none; background:color-mix(in srgb,var(--primary) 24%, var(--card)); border:1px solid color-mix(in srgb,var(--primary) 45%,transparent); color:var(--text); font-weight:700; font-size:13px; padding:10px 16px; border-radius:999px; z-index:60; transition:.2s; }
   .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+  .card > h2{ cursor:pointer; user-select:none; }
+  .card > h2::after{ content:"\25BE"; float:right; opacity:.7; transition:transform .2s; }
+  .card.collapsed > h2{ margin-bottom:0; }
+  .card.collapsed > h2::after{ transform:rotate(-90deg); }
+  .card.collapsed > *:not(h2){ display:none !important; }
   .prefRow > div{ background:rgba(255,255,255,.035); border:1px solid var(--line); border-radius:14px; padding:13px; }
   @media (max-width:760px){ .card h2{ text-align:center; } .heroStat{ text-align:center; } .big, .note, .status, .eyebrow{ text-align:center; } .legend, .palette{ justify-content:center; } }
   @media (max-width:560px){ .modal{ align-items:flex-end; padding:0; } .sheet{ border-radius:20px 20px 0 0; max-width:none; } .cmdIn{ justify-content:center; } .brand{ flex:1 1 100%; justify-content:center; text-align:center; margin-right:0; } .big{ font-size:25px; } }
@@ -888,6 +893,7 @@ HTML2 = r"""<!DOCTYPE html>
     <div class="card">
       <h2 id="devTitle">Connected devices</h2>
       <div id="deviceList"><div class="status">Loading&#8230;</div></div>
+      <button class="btn ghost" data-control style="width:100%;margin-top:12px" onclick="clearAllStats()">Clear all device statistics</button>
     </div>
     <div class="card" style="margin-top:13px">
       <h2>Blocked devices</h2>
@@ -1009,13 +1015,14 @@ HTML2 = r"""<!DOCTYPE html>
 const $ = id => document.getElementById(id);
 function setText(id,v){ const el=$(id); if(el) el.textContent=(v==null||v==="")?"\u2014":v; }
 function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
-function fmtBytes(n){ if(n==null) return "\u2014"; n=+n; const u=["B","KB","MB","GB","TB"]; let i=0; while(n>=1024&&i<u.length-1){n/=1024;i++;} return n.toFixed(i?1:0)+" "+u[i]; }
+function fmtBytes(n){ if(n==null) return "\u2014"; n=+n; const u=["B","KB","MB","GB","TB"]; let i=0; while(n>=1000&&i<u.length-1){n/=1000;i++;} return n.toFixed(i?1:0)+" "+u[i]; }
 function mbps(bps){ return bps==null ? "0.0" : (bps*8/1e6).toFixed(1); }
 function agoFmt(sec){ sec=+sec; if(sec<60) return sec+"s ago"; if(sec<3600) return Math.floor(sec/60)+"m ago"; return Math.floor(sec/3600)+"h ago"; }
 
 function showTab(btn,id){
   document.querySelectorAll('.tab').forEach(t=>t.setAttribute('aria-selected', t===btn));
   document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active', p.id===id));
+  if(id==='overview'){ sizeCanvas(); draw(); }
   if(id==='network'){ loadWifi(); loadBackups(); }
   if(id==='devices') loadBlocked();
   window.scrollTo({top:0,behavior:'smooth'});
@@ -1137,14 +1144,15 @@ function renderDevices(clients){
     <div class="dev${openDevs.has(k)?' open':''}" onclick="toggleDev(this,'${k}')">
       <div class="devTop">
         <div><div class="devName">${(c.name||'Device')}</div><div class="devMeta">${c.ip||''} \u00b7 ${c.mac||''}</div></div>
-        <div class="chev">&#8964;</div>
+        <div class="chev">&#9662;</div>
       </div>
       <div class="devBody">
         <div class="kv"><div class="k">Down</div><div class="v">${fmtBytes(c.rx)}</div></div>
         <div class="kv"><div class="k">Up</div><div class="v">${fmtBytes(c.tx)}</div></div>
         <div class="kv"><div class="k">State</div><div class="v">${c.state||'\u2014'}</div></div>
         <div class="kv"><div class="k">Policy</div><div class="v">${c.policy||'VPN'}</div></div>
-        <button class="btn ghost" data-control style="grid-column:1 / -1; padding:9px; font-size:13px" onclick="renameDev(event,'${k}')">Rename device</button>
+        <button class="btn ghost" data-control style="padding:9px; font-size:13px" onclick="renameDev(event,'${k}')">Rename device</button>
+        <button class="btn ghost" data-control style="padding:9px; font-size:13px" onclick="clearDevStats(event,'${k}')">Clear stats</button>
         <div style="grid-column:1 / -1; display:grid; grid-template-columns:repeat(4,1fr); gap:8px">
           <button class="btn ghost" data-control style="padding:8px 6px; font-size:12px" onclick="devCtl(event,'${k}','${c.policy==='Blocked'?'unblock':'block'}')">${c.policy==='Blocked'?'Unblock':'Block'}</button>
           <button class="btn ghost" data-control style="padding:8px 6px; font-size:12px" onclick="devCtl(event,'${k}','prioritize')">Prioritize</button>
@@ -1278,6 +1286,50 @@ async function unblockIp(ip){
   }catch(e){ toast('Failed'); }
 }
 
+/* device statistics */
+async function clearDevStats(ev,key){ ev.stopPropagation();
+  const c=_devs.find(d=>devKey(d)===key); if(!c||!c.ip) return;
+  try{ const r=await fetch('/api/clear-device-stats',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ip:c.ip})});
+    const j=await r.json(); toast(j.ok?(j.message||'Cleared'):(j.error||'Failed')); lastDevJson=''; load();
+  }catch(e){ toast('Failed'); }
+}
+async function clearAllStats(){
+  if(!confirm('Clear traffic statistics for all devices?')) return;
+  try{ const r=await fetch('/api/clear-device-stats',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({all:true})});
+    const j=await r.json(); toast(j.ok?(j.message||'Cleared'):(j.error||'Failed')); lastDevJson=''; load();
+  }catch(e){ toast('Failed'); }
+}
+
+/* graph history prefill */
+async function loadRateHistory(){
+  try{ const r=await fetch('/api/rate-history'); const j=await r.json();
+    const s=(j&&j.samples)||[]; if(!s.length) return;
+    const take=s.slice(-rx.length);
+    for(let i=0;i<take.length;i++){ rx[rx.length-take.length+i]=take[i].down; tx[tx.length-take.length+i]=take[i].up; }
+    draw();
+  }catch(e){}
+}
+
+/* collapsible cards */
+function initCollapsibles(){
+  let saved={};
+  try{ saved=JSON.parse(localStorage.getItem('collapsedCards')||'{}'); }catch(e){}
+  document.querySelectorAll('.card > h2').forEach(h=>{
+    const card=h.parentElement;
+    const key=h.id || 'card-'+h.textContent.trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/-+$/,'');
+    card.dataset.ckey=key;
+    if(saved[key]) card.classList.add('collapsed');
+    h.addEventListener('click',()=>{
+      card.classList.toggle('collapsed');
+      let set={};
+      try{ set=JSON.parse(localStorage.getItem('collapsedCards')||'{}'); }catch(e){}
+      if(card.classList.contains('collapsed')) set[key]=1; else delete set[key];
+      try{ localStorage.setItem('collapsedCards',JSON.stringify(set)); }catch(e){}
+      sizeCanvas(); draw();
+    });
+  });
+}
+
 /* dashboard domain */
 async function applyDomain(){
   const d=($('domainInput').value||'').trim().toLowerCase() || 'protonpi.local';
@@ -1300,7 +1352,6 @@ function populateWifiChannels(){
   chan.innerHTML='<option>Auto</option>'+CH[band].map(c=>`<option>${c}</option>`).join('');
   if(Array.from(chan.options).some(o=>o.value===cur)) chan.value=cur;
 }
-let wifiLoaded=false;
 async function loadWifi(){
   try{ const r=await fetch('/api/wifi?ts='+Date.now()); const j=await r.json();
     if(!j.ok){ setText('wifiStatus', j.error||'Wi-Fi unavailable'); return; }
@@ -1312,7 +1363,6 @@ async function loadWifi(){
     $('wifiPassword').value=''; $('wifiPassword').placeholder=j.has_password?'Leave blank to keep current':'Set a password (8-63 chars)';
     $('wifiQr').src='/wifi-qr.png?ts='+Date.now();
     setText('wifiStatus','Active connection: '+(j.connection||''));
-    wifiLoaded=true;
   }catch(e){ setText('wifiStatus','Wi-Fi unavailable'); }
 }
 async function applyWifi(){
@@ -1371,9 +1421,9 @@ async function runSpeedTest(){
 }
 
 /* ---- live traffic graph ---- */
-let rx=new Array(60).fill(0), tx=new Array(60).fill(0), hoverIndex=null;
+let rx=new Array(300).fill(0), tx=new Array(300).fill(0), hoverIndex=null;
 const cv=$('graph'); const gtip=$('gtip');
-function sizeCanvas(){ const r=cv.getBoundingClientRect(); cv.width=r.width*devicePixelRatio; cv.height=150*devicePixelRatio; }
+function sizeCanvas(){ const r=cv.getBoundingClientRect(); if(r.width<2) return; cv.width=r.width*devicePixelRatio; cv.height=150*devicePixelRatio; }
 function pushGraph(downBps,upBps){ rx.push(downBps*8/1e6); rx.shift(); tx.push(upBps*8/1e6); tx.shift(); draw(); }
 function draw(){
   const ctx=cv.getContext('2d'), w=cv.width, h=cv.height; ctx.clearRect(0,0,w,h);
@@ -1391,7 +1441,7 @@ function draw(){
 function gAnnotate(e){ const rect=cv.getBoundingClientRect(), x=e.clientX-rect.left; let i=Math.round(x/rect.width*(rx.length-1)); i=Math.max(0,Math.min(rx.length-1,i));
   hoverIndex=i; draw(); const ago=(rx.length-1-i)*1;
   gtip.innerHTML='<b>'+agoFmt(ago)+'</b><br>\u2193 '+rx[i].toFixed(1)+' \u00b7 \u2191 '+tx[i].toFixed(1)+' Mb/s'; gtip.style.display='block';
-  gtip.style.left=Math.min(Math.max(x,34),rect.width-34)+'px'; }
+  if(x<rect.width/2){ gtip.style.left=(x+14)+'px'; gtip.style.transform='translateX(0)'; } else { gtip.style.left=(x-14)+'px'; gtip.style.transform='translateX(-100%)'; } }
 cv.addEventListener('pointermove',gAnnotate); cv.addEventListener('pointerdown',gAnnotate);
 cv.addEventListener('pointerleave',()=>{ if(window.matchMedia('(hover:hover)').matches){ hoverIndex=null; gtip.style.display='none'; draw(); } });
 
@@ -1413,7 +1463,7 @@ function drawMetric(){ const mcv=$('mGraph'); const r=mcv.getBoundingClientRect(
   const cur=mHist[mHist.length-1]; $('mNow').innerHTML='<b>'+(cur==null?'\u2014':cur.toFixed(mMeta.dp))+'</b> '+mMeta.unit; }
 (function(){ const mcv=$('mGraph'), mtip=$('mtip');
   function mAnnotate(e){ if(!mMeta||!mHist.length) return; const rect=mcv.getBoundingClientRect(), x=e.clientX-rect.left; let i=Math.round(x/rect.width*(mHist.length-1)); i=Math.max(0,Math.min(mHist.length-1,i));
-    mHover=i; drawMetric(); const ago=(mHist.length-1-i)*3; mtip.innerHTML='<b>'+agoFmt(ago)+'</b><br>'+mHist[i].toFixed(mMeta.dp)+' '+mMeta.unit; mtip.style.display='block'; mtip.style.left=Math.min(Math.max(x,34),rect.width-34)+'px'; }
+    mHover=i; drawMetric(); const ago=(mHist.length-1-i)*3; mtip.innerHTML='<b>'+agoFmt(ago)+'</b><br>'+mHist[i].toFixed(mMeta.dp)+' '+mMeta.unit; mtip.style.display='block'; if(x<rect.width/2){ mtip.style.left=(x+14)+'px'; mtip.style.transform='translateX(0)'; } else { mtip.style.left=(x-14)+'px'; mtip.style.transform='translateX(-100%)'; } }
   mcv.addEventListener('pointermove',mAnnotate); mcv.addEventListener('pointerdown',mAnnotate);
   mcv.addEventListener('pointerleave',()=>{ if(window.matchMedia('(hover:hover)').matches){ mHover=null; mtip.style.display='none'; drawMetric(); } }); })();
 
@@ -1421,7 +1471,6 @@ window.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeMetric(); canc
 window.addEventListener('resize',()=>{ sizeCanvas(); draw(); });
 
 /* ---- main poll ---- */
-let lastStatus=null;
 async function load(){
   await checkAuth();
   let s;
@@ -1464,7 +1513,6 @@ async function load(){
   syncPriorityUI(s);
   const di=$('domainInput'); if(di && document.activeElement!==di && !di.value) di.value=(s.settings&&s.settings.custom_domain)||'protonpi.local';
   if(s.settings){ if($('rebootDay').value!==(s.settings.reboot_day||'off')) $('rebootDay').value=s.settings.reboot_day||'off'; if(document.activeElement!==$('rebootTime')) $('rebootTime').value=s.settings.reboot_time||'04:00'; }
-  lastStatus=s;
 }
 
 /* live throughput + graph poll (fast, lightweight) */
@@ -1483,8 +1531,10 @@ async function pollRate(){
 
 /* init */
 sizeCanvas(); draw();
+initCollapsibles();
 loadProfiles();
 load();
+loadRateHistory();
 pollRate(); setInterval(pollRate, 1000);
 setInterval(load, 3000);
 </script>
@@ -1870,6 +1920,24 @@ def api_client_policies():
     auth = require_control_auth()
     if auth: return auth
     return jsonify({"ok": True, "policies": client_policies(), "names": client_names()})
+
+
+@app.route("/api/clear-device-stats", methods=["POST"])
+def api_clear_device_stats():
+    auth = require_control_auth()
+    if auth: return auth
+    data = request.get_json(force=True)
+    if data.get("all"):
+        run(["sh", "-c", "iptables -Z PP_CLIENT_TX 2>/dev/null; iptables -Z PP_CLIENT_RX 2>/dev/null"], 5)
+        STATUS_CACHE.pop("clients", None)
+        return jsonify({"ok": True, "message": "All device statistics cleared"})
+    ip = (data.get("ip") or "").strip()
+    if not re.match(r"^10\.42\.\d{1,3}\.\d{1,3}$", ip):
+        return jsonify({"ok": False, "error": "Invalid IP"}), 400
+    run(["sh", "-c", "iptables -D PP_CLIENT_TX -s %s -j RETURN 2>/dev/null && iptables -A PP_CLIENT_TX -s %s -j RETURN" % (ip, ip)], 5)
+    run(["sh", "-c", "iptables -D PP_CLIENT_RX -d %s -j RETURN 2>/dev/null && iptables -A PP_CLIENT_RX -d %s -j RETURN" % (ip, ip)], 5)
+    STATUS_CACHE.pop("clients", None)
+    return jsonify({"ok": True, "message": "Statistics cleared for %s" % ip})
 
 
 @app.route("/api/device-control", methods=["POST"])
@@ -2400,7 +2468,13 @@ def api_wifi_set():
 METRIC_HISTORY = {"temp": [], "cpu": [], "mem": [], "disk": []}
 METRIC_HISTORY_MAX = 120
 
+METRIC_LAST_SAMPLE = {"t": 0.0}
+
 def sample_metric_history(temp, cpu, mem, disk):
+    now = time.time()
+    if now - METRIC_LAST_SAMPLE["t"] < 2.5:
+        return
+    METRIC_LAST_SAMPLE["t"] = now
     for k, v in (("temp", temp), ("cpu", cpu), ("mem", mem), ("disk", disk)):
         if v is None:
             continue
@@ -2503,12 +2577,35 @@ def api_power():
         return jsonify({"ok": True, "message": "Shutting down"})
     return jsonify({"ok": False, "error": "Unknown action"}), 400
 
+RATE_HISTORY = []
+RATE_HISTORY_MAX = 300
+RATE_LAST = {"t": 0.0, "rx": 0, "tx": 0}
+
 @app.route("/api/rate")
 def api_rate():
     auth = require_control_auth()
     if auth: return auth
     wg = iface_bytes("wg0")
-    return jsonify({"time": time.time(), "rx": wg["rx"], "tx": wg["tx"]})
+    now = time.time()
+    dt = now - RATE_LAST["t"]
+    if RATE_LAST["t"] > 0 and dt >= 0.9:
+        down = max(wg["rx"] - RATE_LAST["rx"], 0) / dt * 8 / 1e6
+        up = max(wg["tx"] - RATE_LAST["tx"], 0) / dt * 8 / 1e6
+        RATE_HISTORY.append({"down": round(down, 2), "up": round(up, 2)})
+        if len(RATE_HISTORY) > RATE_HISTORY_MAX:
+            del RATE_HISTORY[:len(RATE_HISTORY) - RATE_HISTORY_MAX]
+    if RATE_LAST["t"] == 0 or dt >= 0.9:
+        RATE_LAST["t"] = now
+        RATE_LAST["rx"] = wg["rx"]
+        RATE_LAST["tx"] = wg["tx"]
+    return jsonify({"time": now, "rx": wg["rx"], "tx": wg["tx"]})
+
+
+@app.route("/api/rate-history")
+def api_rate_history():
+    auth = require_control_auth()
+    if auth: return auth
+    return jsonify({"ok": True, "samples": RATE_HISTORY})
 
 
 @app.route("/api/backups")
